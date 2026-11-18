@@ -5,7 +5,22 @@ import pandas as pd
 import pytest
 from shapely.geometry import box
 
-from lanet.download import extract_households, join_households
+from lanet.download import build_geoid, extract_households, join_households
+
+
+@pytest.mark.parametrize(
+    ("state", "county", "tract", "block_group", "expected"),
+    [
+        ("06", "037", "101110", "1", "060371011101"),
+        ("06", "037", "000100", "2", "060370001002"),
+        ("01", "001", "000001", "0", "010010000010"),
+        ("12", "086", "001402", "3", "120860014023"),
+    ],
+)
+def test_geoid_build(state, county, tract, block_group, expected):
+    result = build_geoid(state, county, tract, block_group)
+    assert result == expected
+    assert len(result) == 12
 
 
 def test_summary_preserves_moe_and_builds_geoid(tmp_path):

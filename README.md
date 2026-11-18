@@ -161,6 +161,16 @@ divided by its complete retained land area. Buffering creates coverage candidate
 it does not create demand outside the study area. Per-group area coverage and
 household conservation are checked without renormalizing missing intersections.
 
+Area weighting distributes a block group's households across all intersecting cells.
+Assigning its entire total to the centroid's cell would concentrate a large rural
+block group's demand in one cell and leave its other cells artificially empty.
+The chosen method assumes uniform household density within each block group's
+retained land; the ACS data do not reveal household locations inside the group.
+
+The four requested stage-1 tests use synthetic inputs without data downloads:
+`test_allocation_conserves_total`, `test_allocation_split`,
+`test_cell_polygon_contains_center`, and the parameterized `test_geoid_build`.
+
 | Check | Computed result |
 | --- | ---: |
 | County household total | 3,390,254 |

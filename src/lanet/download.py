@@ -29,6 +29,24 @@ def download_file(url: str, directory: Path) -> Path:
     return destination
 
 
+def build_geoid(state: str, county: str, tract: str, block_group: str) -> str:
+    """Concatenate fixed-width Census geography strings without losing zeros."""
+    for name, value, width in (
+        ("state", state, 2),
+        ("county", county, 3),
+        ("tract", tract, 6),
+        ("block_group", block_group, 1),
+    ):
+        if (
+            not isinstance(value, str)
+            or len(value) != width
+            or not value.isascii()
+            or not value.isdigit()
+        ):
+            raise ValueError(f"{name} must be a {width}-digit string")
+    return state + county + tract + block_group
+
+
 def extract_households(path: Path, state: str, county: str) -> tuple[pd.DataFrame, int]:
     """Map Summary File columns to API names and build 12-character GEOIDs.
 
@@ -57,7 +75,12 @@ def extract_households(path: Path, state: str, county: str) -> tuple[pd.DataFram
                 "tract": geography[5:11],
                 "block group": geography[11:],
             }
-            geoid = "".join(components.values())
+            geoid = build_geoid(
+                components["state"],
+                components["county"],
+                components["tract"],
+                components["block group"],
+            )
             estimate = int(row["B11001_E001"])
             moe = int(row["B11001_M001"])
             if estimate < 0 or moe < 0:
