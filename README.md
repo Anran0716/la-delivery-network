@@ -5,8 +5,9 @@
 An independent project to plan the location and capacity of last-mile delivery
 stations in Los Angeles County. The intended decision is how many stations to open,
 where to put them, and how the network performs under a 40% demand peak or a station
-outage. **Period 0 is the repository foundation; no station recommendations or
-county-level results have been computed yet.**
+outage. **The period 0 foundation is complete, and the period 1 county inputs have
+been downloaded and joined. No station recommendations or location-model results
+have been computed yet.**
 
 The planned pipeline uses ACS households, H3 demand cells, OSM industrial land and
 directed driving times, a capacitated facility-location model in PuLP, and a tested
@@ -42,7 +43,37 @@ The solver smoke test checks actual execution, in addition to solver discovery.
 
 Tests use only repository configuration, temporary files, and a tiny local MILP.
 CI installs software dependencies but does not download ACS, TIGER, OSM, or other
-study data. The analytical modules and SQL are explicitly reserved for later periods.
+study data. Analytical modules and SQL beyond the county input join are reserved
+for later periods.
+
+## Download the county inputs
+
+```powershell
+.venv\Scripts\python.exe scripts/01_download.py
+```
+
+Sources and outputs are saved under `data/raw/` and stay out of Git. Existing
+downloads are reused. The script validates the TIGER ZIP, retains only
+`COUNTYFP == "037"`, builds the 12-digit GEOID from string geography components,
+and requires zero unmatched GEOIDs in both directions before joining.
+
+The guide's keyless API example no longer works: [Census now requires a key for
+data queries](https://www.census.gov/library/video/2026/adrm/requesting-a-census-data-api-key.html).
+The downloader uses the [official 2023 ACS five-year Summary
+File](https://www.census.gov/programs-surveys/acs/data/summary-file.2023.html),
+which contains the same Detailed Table estimates and margins of error. It maps
+`B11001_E001` to API field `B11001_001E`, and `B11001_M001` to `B11001_001M`.
+
+The county CSV and joined GeoPackage retain both fields. CSV geography columns
+must be read as strings to preserve leading zeros; the GeoPackage stores them as
+text. The manifest records source URLs, file sizes, SHA256 hashes, and join counts.
+This step includes the county's islands; mainland selection comes next. Margins
+of error describe uncertainty in the household estimates and must not simply be
+added together or interpreted as parcel-demand uncertainty.
+
+The downloaded inputs contain **6,591 block groups** in both ACS and TIGER, with
+**zero unmatched GEOIDs** in either direction. Their household estimates sum to
+**3,390,254**, exactly matching the county record in the same Summary File.
 
 ## Configuration and assumptions
 
@@ -99,7 +130,7 @@ data/processed/            Local outputs, ignored by Git
 ## Implementation plan
 
 - [x] Period 0: configuration, package structure, offline tests, pre-commit hooks, CI.
-- [ ] Period 1: ACS/TIGER downloads, join coverage checks, mainland geometry, H3 allocation.
+- [ ] Period 1: county downloads and join checks complete; mainland geometry and H3 pending.
 - [ ] Period 2: industrial candidates, road graph, directed times, infeasibility report.
 - [ ] Period 3: CFLP v1, four hand-checked toy cases, independent solution checker.
 - [ ] Period 4: single-sourcing, peak/outage stress tests, sensitivities, robust sites.

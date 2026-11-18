@@ -1,7 +1,7 @@
 # Pipeline scripts
 
-These entry points will be added in the corresponding implementation periods.
-No data download or analysis is implemented in period 0.
+`01_download.py` downloads and joins the county inputs. The remaining entry points
+will be added in their corresponding implementation periods.
 
 | Script | Purpose | Period |
 | --- | --- | --- |

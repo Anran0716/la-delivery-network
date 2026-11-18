@@ -47,6 +47,7 @@ TEXT_FIELDS = {
         "household_variable",
         "household_moe_variable",
         "census_api_base",
+        "acs_summary_url",
         "tiger_bg_url",
         "raw_dir",
         "processed_dir",

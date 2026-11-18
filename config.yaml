@@ -13,6 +13,7 @@ data:
   household_variable: B11001_001E
   household_moe_variable: B11001_001M
   census_api_base: https://api.census.gov/data
+  acs_summary_url: https://www2.census.gov/programs-surveys/acs/summary_file/2023/table-based-SF/data/5YRData/acsdt5y2023-b11001.dat
   tiger_bg_url: https://www2.census.gov/geo/tiger/TIGER2023/BG/tl_2023_06_bg.zip
   raw_dir: data/raw
   processed_dir: data/processed
