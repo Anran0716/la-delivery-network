@@ -1,11 +1,14 @@
 # Pipeline scripts
 
-`01_download.py` downloads and joins the county inputs. The remaining entry points
-will be added in their corresponding implementation periods.
+`01_download.py` downloads and joins the county inputs. `02_demand.py` constructs
+and audits the mainland H3 demand layer. The remaining entry points will be added
+in their corresponding implementation periods.
 
 Run `audit_water.py` after `01_download.py` and before H3 allocation. It audits
 ALAND/AWATER, checks the same-year TIGER topological-face area totals, and saves
 land geometry plus a verification report under `data/processed/`.
+Then run `02_demand.py` for the 2 km buffered grid, island ledger, demand allocation,
+conservation checks, marine-center diagnostics, and land routing points.
 
 | Script | Purpose | Period |
 | --- | --- | --- |

@@ -5,9 +5,9 @@
 An independent project to plan the location and capacity of last-mile delivery
 stations in Los Angeles County. The intended decision is how many stations to open,
 where to put them, and how the network performs under a 40% demand peak or a station
-outage. **The period 0 foundation is complete, and the period 1 county inputs have
-been downloaded and joined. No station recommendations or location-model results
-have been computed yet.**
+outage. **Periods 0 and 1 are complete: the repository foundation, county inputs,
+land geometry, and mainland H3 demand layer have been validated. No station
+recommendations or location-model results have been computed yet.**
 
 The planned pipeline uses ACS households, H3 demand cells, OSM industrial land and
 directed driving times, a capacitated facility-location model in PuLP, and a tested
@@ -137,9 +137,79 @@ This mask represents Census land classification, not residential land use: unifo
 household density within the retained land remains an assumption.
 
 A coastal H3 cell can intersect land while its center lies offshore. The next demand
-step must retain the land intersection and use a point on its retained mainland
-portion for routing, then audit road-snap distances. Water clipping alone does not
-guarantee that every original H3 center is on land.
+step retains the land intersection and stores a point on its retained mainland
+portion for routing. Road-snap distances still need to be audited in period 2.
+
+## Mainland demand results
+
+After the water audit, run:
+
+```powershell
+.venv\Scripts\python.exe scripts/02_demand.py
+```
+
+The largest contiguous component is selected from the original county geometry,
+before water removal. This retains mainland land separated by rivers. The prepared
+land block groups are then partitioned against that component; a group spanning
+mainland and island components causes an explicit error instead of a centroid-based
+assignment. This dataset has no such spanning groups.
+
+The retained land footprint is buffered by **2,000 meters in EPSG:3310**, converted
+to WGS84, and filled with resolution-7 H3 cells. Allocation uses the unbuffered
+land: each block group's households are multiplied by its cell-intersection area
+divided by its complete retained land area. Buffering creates coverage candidates;
+it does not create demand outside the study area. Per-group area coverage and
+household conservation are checked without renormalizing missing intersections.
+
+| Check | Computed result |
+| --- | ---: |
+| County household total | 3,390,254 |
+| Excluded island households, six block groups | 1,231 |
+| Mainland households, 6,581 block groups | 3,389,023 |
+| Generated cells after the 2 km buffer | 1,965 |
+| Cells intersecting mainland land | 1,902 |
+| Positive-demand cells | 1,865 |
+| Allocated household total | 3,389,023 |
+| Absolute / relative household conservation error | 0 households / 0% |
+| Largest per-group relative area coverage error | 9.004 × 10⁻¹⁴ |
+| Original H3 centers in marine water, positive-demand cells | 30 / 1,865 |
+| Original H3 centers in marine water, complete generated grid | 44 / 1,965 |
+| Original centers outside the county, positive-demand cells | 72 / 1,865 |
+| Assumption-based parcels per day | 508,353.45 |
+
+For a scale check, the separately published 2023 ACS Avalon city household estimate
+is **1,200**, with MOE **177**. It is a different geographic estimate from the island
+block-group sum and is not used to force that sum to reconcile. The place GEOID
+`0603274` is identified as Avalon city in the [2023 Census
+Gazetteer](https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2023_Gazetteer/2023_gaz_place_06.txt).
+
+The five highest-demand cells are:
+
+| H3 cell | Households | Center latitude | Center longitude |
+| --- | ---: | ---: | ---: |
+| `8729a1d63ffffff` | 42,431.58 | 34.065431 | -118.293267 |
+| `8729a1d62ffffff` | 32,666.82 | 34.054670 | -118.268798 |
+| `8729a1d6affffff` | 23,119.19 | 34.099363 | -118.318181 |
+| `8729a5616ffffff` | 22,144.79 | 33.779439 | -118.166830 |
+| `8729a1d75ffffff` | 21,682.88 | 34.043903 | -118.244331 |
+
+Fractional households reflect area-weighted allocation. Positive demand extends
+across the full retained mainland, including sparsely populated Antelope Valley;
+zero-demand cells are removed after allocation.
+
+Marine-center flags use TIGER ocean and bay/estuary polygons (`H2053`, `H2051`),
+including Orange and Ventura county context for the buffered border. One positive
+cell's sea center lies outside LA County. A center outside the county is not
+automatically a sea center, and marine water is distinguished from inland water.
+The original H3 `lat` and `lng` remain unchanged for this audit. Period 2 routing
+must use the separate `route_lat` and `route_lng` on the largest retained,
+positive-demand land part; this does not establish road accessibility by itself.
+
+Outputs in `data/processed/` include `demand_cells.parquet`, `demand_land.parquet`,
+`block_group_allocation.parquet`, `generated_h3_grid.parquet`,
+`excluded_island_block_groups.csv`, `sea_center_demand_cells.csv`, and
+`demand_report.json`. The source-to-cell crosswalk retains source MOEs and allocation
+shares so later uncertainty analysis can account for shared source estimates.
 
 ## Download and join design decisions
 
@@ -221,7 +291,7 @@ data/processed/            Local outputs, ignored by Git
 ## Implementation plan
 
 - [x] Period 0: configuration, package structure, offline tests, pre-commit hooks, CI.
-- [ ] Period 1: county downloads and join checks complete; mainland geometry and H3 pending.
+- [x] Period 1: county downloads, join checks, water audit, mainland geometry, H3 allocation.
 - [ ] Period 2: industrial candidates, road graph, directed times, infeasibility report.
 - [ ] Period 3: CFLP v1, four hand-checked toy cases, independent solution checker.
 - [ ] Period 4: single-sourcing, peak/outage stress tests, sensitivities, robust sites.

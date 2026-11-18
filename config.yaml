@@ -16,11 +16,17 @@ data:
   acs_summary_url: https://www2.census.gov/programs-surveys/acs/summary_file/2023/table-based-SF/data/5YRData/acsdt5y2023-b11001.dat
   tiger_bg_url: https://www2.census.gov/geo/tiger/TIGER2023/BG/tl_2023_06_bg.zip
   tiger_faces_url: https://www2.census.gov/geo/tiger/TIGER2023/FACES/tl_2023_06037_faces.zip
+  tiger_area_water_url: https://www2.census.gov/geo/tiger/TIGER2023/AREAWATER/tl_2023_06037_areawater.zip
+  orange_area_water_url: https://www2.census.gov/geo/tiger/TIGER2023/AREAWATER/tl_2023_06059_areawater.zip
+  ventura_area_water_url: https://www2.census.gov/geo/tiger/TIGER2023/AREAWATER/tl_2023_06111_areawater.zip
+  reference_place_geoid: "0603274"
+  reference_place_name: Avalon city
   raw_dir: data/raw
   processed_dir: data/processed
 
 demand:
   h3_resolution: 7
+  grid_buffer_m: 2000
   allocation_method: area_weighted
   allocation_geometry: tiger_minus_perennial_water_faces
   geometry_overlap_tolerance_m2: 1.0

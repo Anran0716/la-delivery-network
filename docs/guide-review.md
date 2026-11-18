@@ -1,7 +1,8 @@
 # P2 guide review
 
-The period 0 scaffold follows the guide. The following points need explicit handling
-as the project progresses; no county data or scenario results have been generated yet.
+The repository foundation and mainland demand layer are complete. The following
+notes record compatibility decisions and remaining modeling issues. Measured
+county and H3 results are reported in the README; scenario results are pending.
 
 ## PuLP compatibility resolved in period 0
 
