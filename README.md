@@ -75,6 +75,97 @@ The downloaded inputs contain **6,591 block groups** in both ACS and TIGER, with
 **zero unmatched GEOIDs** in either direction. Their household estimates sum to
 **3,390,254**, exactly matching the county record in the same Summary File.
 
+## Water audit and allocation geometry
+
+Before constructing H3 demand, run:
+
+```powershell
+.venv\Scripts\python.exe scripts/audit_water.py
+```
+
+The requested metadata check on the joined TIGER inputs is:
+
+```python
+coastal = joined[joined.AWATER > 0]
+print(len(coastal), coastal.AWATER.sum() / joined.AWATER.add(joined.ALAND).sum())
+# 958 0.14511052006243513
+```
+
+`AWATER > 0` includes inland water as well as coastal water. The county-wide audit,
+before removing islands, finds:
+
+| Check | Result |
+| --- | ---: |
+| Block groups with water | 958 |
+| Water area / total land and water area | 14.5111% |
+| Zero-land block groups | 4 |
+| Households in zero-land groups | 0 |
+| Mixed land/water groups | 954 |
+| Households in mixed groups | 513,663 |
+| Land groups retained after water removal | 6,587 |
+| Households retained | 3,390,254 |
+| Remaining overlap with perennial-water faces | 0 m² |
+
+The zero-land GEOIDs are `060375766020`, `060379901000`, `060379902000`, and
+`060379903000`. Classification uses `ALAND`, not tract-number or final-digit rules.
+Filtering these four records alone leaves the mixed polygons' water geometry intact.
+Changing an area denominator to `ALAND` cannot locate or remove that water.
+
+The allocation geometry therefore retains detailed TIGER block groups and subtracts
+the same-year county topological faces with `LWFLAG="P"` (perennial water). Census
+counts intermittent water as land for area measurement; its land/water flag
+[documentation](https://www.census.gov/programs-surveys/geography/technical-documentation/user-note/tiger-geo-line.2009.html)
+explains this classification. In the actual 2023 faces, `L + I` totals
+10,515,988,121 m², exactly matching block-group `ALAND`; `P` totals 1,785,003,256 m²,
+exactly matching `AWATER`. This also avoids removing the land portions of mixed
+river features in the coarser area-hydrography layer.
+
+`cb_2023_06_bg_500k` is a useful display layer. It uses generalized outlines and can
+omit small areas; Census explicitly excludes area/perimeter analysis from its
+[intended uses](https://www.census.gov/programs-surveys/geography/technical-documentation/naming-convention/cartographic-boundary-file.html).
+The detailed TIGER faces provide the land geometry for area-weighted allocation.
+Both intersection areas and their denominator will use that geometry in EPSG:3310.
+
+The audit writes `data/processed/water_audit.json` and
+`data/processed/block_groups_land_06037_2023.gpkg`, preserving household and MOE
+values. It stops if source area totals disagree, positive demand has zero land,
+land groups disappear, or residual water overlap exceeds the configured 1 m²
+numerical tolerance. Islands remain in this output; mainland selection comes next.
+`ALAND` and `AWATER` remain the original source attributes; the residual-water check
+uses geometry, so it does not mistake retained metadata for unremoved water.
+This mask represents Census land classification, not residential land use: uniform
+household density within the retained land remains an assumption.
+
+A coastal H3 cell can intersect land while its center lies offshore. The next demand
+step must retain the land intersection and use a point on its retained mainland
+portion for routing, then audit road-snap distances. Water clipping alone does not
+guarantee that every original H3 center is on land.
+
+## Download and join design decisions
+
+Downloads first write to `.part` so an interrupted stream does not leave a final
+filename that a later run would mistake for a completed download. Renaming within
+the same directory publishes the finished stream in one filesystem operation.
+This guards against partial visibility; ZIP CRC and table-schema checks separately
+validate the downloaded content.
+
+GEOID coverage checks compare which keys exist in each input. They do not establish
+join cardinality: two tables can contain the same key set and still have repeated
+rows. The explicit duplicate checks give source-specific diagnostics;
+`validate="one_to_one"` also enforces the contract at the merge itself. That final
+guard remains useful if preprocessing changes during a later refactor and prevents
+duplicate matches from multiplying household counts.
+
+ACS MOEs are confidence-interval half-widths, not counts. Variances add with covariance
+terms; MOEs do not add directly. At a common confidence level, ignoring covariance
+gives the approximation `MOE(sum) = sqrt(sum(MOE_i**2))`: MOEs of 3 and 4 give 5,
+not 7. Census's [2023 worked examples](https://www2.census.gov/programs-surveys/acs/tech_docs/accuracy/2023_ACS_Accuracy_Document_Worked_Examples.pdf)
+describe this approximation and its covariance limitation. Use a published county
+MOE when available. H3 cells split from the same source block group share sampling
+error and cannot be treated as independent when recombining their MOEs. These
+sampling MOEs also exclude uncertainty in the assumed parcel rate and within-group
+household distribution.
+
 ## Configuration and assumptions
 
 `config.yaml` is the source of planning parameters. `load_config()` validates required

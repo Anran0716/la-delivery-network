@@ -25,6 +25,31 @@ def test_summary_preserves_moe_and_builds_geoid(tmp_path):
     assert households["B11001_001E"].sum() == county_total == 30
 
 
+@pytest.mark.parametrize("field", ["B11001_E001", "B11001_M001"])
+def test_summary_rejects_negative_sentinel(tmp_path, field):
+    values = {"B11001_E001": "10", "B11001_M001": "3"}
+    values[field] = "-666666666"
+    source = tmp_path / "sentinel.dat"
+    source.write_text(
+        "GEO_ID|B11001_E001|B11001_M001\n"
+        "0500000US06037|10|3\n"
+        f"1500000US060370001001|{values['B11001_E001']}|{values['B11001_M001']}\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="Missing/sentinel ACS value for 060370001001"):
+        extract_households(source, "06", "037")
+
+
+def test_summary_rejects_missing_county_record(tmp_path):
+    source = tmp_path / "missing_county.dat"
+    source.write_text(
+        "GEO_ID|B11001_E001|B11001_M001\n1500000US060370001001|10|3\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="no requested county or block-group records"):
+        extract_households(source, "06", "037")
+
+
 @pytest.mark.parametrize("missing_from", ["ACS", "TIGER"])
 def test_join_rejects_unmatched_geographies(missing_from):
     ids = ["060370001001", "060370001002"]

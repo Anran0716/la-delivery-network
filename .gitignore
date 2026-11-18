@@ -7,7 +7,9 @@ data/processed/
 # Credentials and local environments
 .env
 .env.*
-*.json
+*credentials*.json
+*-creds.json
+keys/
 *.pem
 *.key
 .venv/

@@ -15,12 +15,15 @@ data:
   census_api_base: https://api.census.gov/data
   acs_summary_url: https://www2.census.gov/programs-surveys/acs/summary_file/2023/table-based-SF/data/5YRData/acsdt5y2023-b11001.dat
   tiger_bg_url: https://www2.census.gov/geo/tiger/TIGER2023/BG/tl_2023_06_bg.zip
+  tiger_faces_url: https://www2.census.gov/geo/tiger/TIGER2023/FACES/tl_2023_06037_faces.zip
   raw_dir: data/raw
   processed_dir: data/processed
 
 demand:
   h3_resolution: 7
   allocation_method: area_weighted
+  allocation_geometry: tiger_minus_perennial_water_faces
+  geometry_overlap_tolerance_m2: 1.0
   parcels_per_household_per_day: 0.15
   conservation_relative_tolerance: 0.005
 
