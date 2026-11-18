@@ -1,0 +1,7 @@
+-- Period 5: implement tested scenario metrics after allocation outputs exist.
+-- Utilization = station served parcels / nominal station capacity.
+-- Weighted drive time = sum(minutes * served parcels) / sum(served parcels).
+-- Within-threshold coverage = served parcels within threshold / total demand.
+-- Cost per served parcel = (fixed + delivery costs) / served parcels, excluding penalties.
+-- Unmet rate = unmet parcels / total demand.
+-- Define zero-denominator handling explicitly when implementing these metrics.

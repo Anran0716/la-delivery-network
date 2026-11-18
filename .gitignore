@@ -1,0 +1,30 @@
+# Downloaded data and generated outputs
+data/raw/
+data/processed/
+*.graphml
+*.graphml.gz
+
+# Credentials and local environments
+.env
+.env.*
+*.json
+*.pem
+*.key
+.venv/
+venv/
+
+# Local tools, caches, and verification logs
+.tools/
+.cache/
+.logs/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+.DS_Store
+Thumbs.db
