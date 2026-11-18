@@ -5,7 +5,13 @@ import h3
 import pytest
 from shapely.geometry import Point, box
 
-from lanet.demand import allocate_households, cell_polygon, classify_centers, partition_mainland
+from lanet.demand import (
+    allocate_households,
+    cell_polygon,
+    classify_centers,
+    mark_low_demand,
+    partition_mainland,
+)
 
 
 def source_groups(geometries, households):
@@ -76,3 +82,17 @@ def test_outside_county_is_distinct_from_sea():
     assert result.center_outside_county.tolist() == [False, True, True]
     assert result.center_in_sea.tolist() == [False, True, False]
     assert result.center_in_perennial_water.tolist() == [False, True, False]
+
+
+def test_low_demand_uses_strict_parcel_threshold_and_keeps_every_cell():
+    import pandas as pd
+
+    cells = pd.DataFrame(
+        {"h3": ["a", "b", "c"], "households": [6, 1 / 0.15, 6.9], "parcels": [0.9, 1.0, 1.035]}
+    )
+    marked, report = mark_low_demand(cells, 1.0, 0.15)
+    assert marked.low_demand.tolist() == [True, False, False]
+    assert marked.h3.tolist() == cells.h3.tolist()
+    assert marked.parcels.sum() == cells.parcels.sum()
+    assert report["low_demand_cells"] == 1
+    assert report["household_threshold"] == pytest.approx(6.666666666666667)

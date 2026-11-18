@@ -15,6 +15,7 @@ from lanet.demand import (
     classify_centers,
     demand_land_geometry,
     generate_cells,
+    mark_low_demand,
     partition_mainland,
     summarize_centers,
 )
@@ -73,6 +74,11 @@ def main(config_path: str) -> None:
         served_land[["h3", "route_lat", "route_lng"]], on="h3", validate="one_to_one"
     )
     cells["parcels"] = cells.households * config["demand"]["parcels_per_household_per_day"]
+    cells, low_report = mark_low_demand(
+        cells,
+        config["demand"]["low_demand_parcels_per_day"],
+        config["demand"]["parcels_per_household_per_day"],
+    )
     cells.drop(columns="geometry").to_parquet(processed / "demand_cells.parquet", index=False)
     cells.loc[cells.center_in_sea].drop(columns="geometry").to_csv(
         processed / "sea_center_demand_cells.csv", index=False
@@ -97,6 +103,7 @@ def main(config_path: str) -> None:
             "positive_demand_centers": summarize_centers(cells),
             "marine_source_urls": marine_urls,
             "daily_parcels": float(cells.parcels.sum()),
+            "low_demand": low_report,
             "top_five": cells.nlargest(5, "households")[["h3", "lat", "lng", "households"]].to_dict(
                 "records"
             ),

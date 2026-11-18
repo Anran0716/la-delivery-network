@@ -21,6 +21,7 @@ data:
   ventura_area_water_url: https://www2.census.gov/geo/tiger/TIGER2023/AREAWATER/tl_2023_06111_areawater.zip
   reference_place_geoid: "0603274"
   reference_place_name: Avalon city
+  osm_extract_url: https://download.geofabrik.de/north-america/us/california/socal-latest.osm.pbf
   raw_dir: data/raw
   processed_dir: data/processed
 
@@ -32,8 +33,10 @@ demand:
   geometry_overlap_tolerance_m2: 1.0
   parcels_per_household_per_day: 0.15
   conservation_relative_tolerance: 0.005
+  low_demand_parcels_per_day: 1.0
 
 candidates:
+  boundary_scope: county
   landuse: industrial
   min_area_hectares: 4
   min_spacing_m: 3000
@@ -41,6 +44,14 @@ candidates:
 
 travel:
   network_type: drive
+  network_source: geofabrik
+  graph_query_buffer_m: 500
+  graph_filename: la_mainland_drive.graphml
+  graph_component: largest_strongly_connected
+  snap_point: route
+  request_timeout_seconds: 180
+  overpass_url: https://overpass.private.coffee/api
+  http_user_agent: la-delivery-network/0.1.0 (independent research; https://github.com/Anran0716/la-delivery-network)
   congestion_multiplier: 1.3
   coverage_minutes: 30
   matrix_cutoff_minutes: 45

@@ -146,3 +146,25 @@ def demand_land_geometry(overlaps: gpd.GeoDataFrame, active_cells: pd.Series) ->
     land["route_lat"] = points.y.to_numpy()
     land["route_lng"] = points.x.to_numpy()
     return land
+
+
+def mark_low_demand(
+    cells: pd.DataFrame, parcel_threshold: float, parcels_per_household: float
+) -> tuple[pd.DataFrame, dict]:
+    """Flag small demand without dropping any cells or changing their quantities."""
+    result = cells.copy()
+    result["low_demand"] = result.parcels < parcel_threshold
+    small = result.loc[result.low_demand]
+    total = float(result.parcels.sum())
+    return result, {
+        "threshold_parcels_per_day": parcel_threshold,
+        "household_threshold": parcel_threshold / parcels_per_household,
+        "comparison": "strictly_less_than",
+        "cells": len(result),
+        "low_demand_cells": len(small),
+        "low_demand_cell_share": len(small) / len(result) if len(result) else 0.0,
+        "low_demand_households": float(small.households.sum()),
+        "low_demand_parcels_per_day": float(small.parcels.sum()),
+        "low_demand_parcel_share": float(small.parcels.sum()) / total if total else 0.0,
+        "retention_policy": "All cells retained; merging decision deferred to period 3",
+    }

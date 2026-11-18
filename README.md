@@ -41,10 +41,11 @@ PuLP is pinned to **3.3.0**, which retains the bundled CBC binary and
 installation](https://github.com/coin-or/pulp/blob/master/doc/source/guides/how_to_migrate_to_v4.rst).
 The solver smoke test checks actual execution, in addition to solver discovery.
 
-Tests use only repository configuration, temporary files, and a tiny local MILP.
+Tests use repository configuration, temporary files, synthetic geometries/graphs,
+and a tiny local MILP.
 CI installs software dependencies but does not download ACS, TIGER, OSM, or other
-study data. Analytical modules and SQL beyond the county input join are reserved
-for later periods.
+study data. Candidate selection, travel-time matrices, optimization, and SQL
+metrics are reserved for later periods.
 
 ## Download the county inputs
 
@@ -138,7 +139,7 @@ household density within the retained land remains an assumption.
 
 A coastal H3 cell can intersect land while its center lies offshore. The next demand
 step retains the land intersection and stores a point on its retained mainland
-portion for routing. Road-snap distances still need to be audited in period 2.
+portion for routing. Actual road-snap distances are compared below.
 
 ## Mainland demand results
 
@@ -221,6 +222,112 @@ Outputs in `data/processed/` include `demand_cells.parquet`, `demand_land.parque
 `demand_report.json`. The source-to-cell crosswalk retains source MOEs and allocation
 shares so later uncertainty analysis can account for shared source estimates.
 
+## Preparation for routing and model size
+
+Production demand-node selection uses **`route_lat` / `route_lng`**. The original
+H3 `lat` / `lng` are retained as audit coordinates. Both point types are snapped
+to the same largest strongly connected driving component. The selected model
+column is `node_id = route_node`; there is no fallback to the H3 center when route
+coordinates are missing.
+
+The common strongly connected component makes its selected nodes mutually
+reachable on the directed graph. This removes disconnected fragments, so its snap
+distances can exceed distances to any road fragment. Long snaps remain flagged
+for inspection; neither point type nor low demand is used to hide those cases.
+
+```powershell
+.venv\Scripts\python.exe -m pip install -e ".[downloads]"
+.venv\Scripts\python.exe scripts/download_drive_graph.py
+.venv\Scripts\python.exe scripts/compare_snaps.py
+```
+
+`demand_snaps.parquet` and its CSV companion retain `route_node`, `center_node`,
+`route_snap_m`, `center_snap_m`, `snap_improvement_m`, both >1,000 m warning flags,
+and the selected `node_id`. Positive improvement means the route point is closer.
+These are point-to-nearest-node distances, not distance along the road or drive
+times. The [OSMnx distance API](https://osmnx.readthedocs.io/en/stable/user-reference.html#osmnx.distance.nearest_nodes)
+returns distances in meters for the unprojected graph. The report includes median,
+95th percentile, maximum, demand-weighted mean, warning counts, and both better and
+worse paired outcomes for all cells, marine-center cells, and low-demand cells.
+
+The source is configured explicitly. Public Overpass requests returned full-capacity
+errors or timed out during this run, so the driving graph is built offline from the
+[Geofabrik Southern California OSM extract](https://download.geofabrik.de/north-america/us/california/socal.html).
+The extract is clipped to the county mainland with a 500 m construction buffer;
+OSMnx simplifies the directed graph and truncates it to the mainland boundary.
+Original OSM node IDs, road tags, and one-way directions are retained. The offline
+way filter records the OSMnx 2.1.2 `drive` exclusions. GraphML, a locally generated
+binary reload cache, and source/version/SHA256 metadata remain in ignored raw data.
+Road data are © OpenStreetMap contributors, supplied by Geofabrik under ODbL 1.0.
+This run's PBF header identifies the snapshot as **2026-11-17 21:24:30 UTC**;
+its SHA256 is `294918282c23fde393c2e40bba6b91b2854ec117454a910604076d859d9853f1`.
+The road snapshot is newer than the ACS and TIGER 2023 inputs, so this is not a
+same-year reconstruction of demand and infrastructure.
+
+The cached simplified graph contains **175,463 nodes / 461,820 directed edges**;
+the common routing component contains **174,022 nodes / 460,060 edges**. The actual
+comparison across all **1,865** positive-demand cells is:
+
+| Point-to-node distance check | Original H3 center | Land route point |
+| --- | ---: | ---: |
+| Median, m | 493.35 | 433.15 |
+| 95th percentile, m | 4,746.48 | 4,684.02 |
+| Maximum, m | 8,002.69 | 8,002.71 |
+| Parcel-weighted mean, m | 106.29 | 97.37 |
+| Cells above 1,000 m | 661 | 627 |
+| Total parcel demand in those warning cells | 0.611142% | 0.499512% |
+
+Route points are closer in **1,037** paired cases and farther in **828**. Their
+purpose is to place the origin on its allocated demand land, not to guarantee a
+shorter road snap. The **30 cells whose original centers lie in the sea** show:
+
+| Marine-center subset | Original H3 center | Land route point |
+| --- | ---: | ---: |
+| Median, m | 954.95 | 135.81 |
+| 95th percentile, m | 1,780.70 | 767.05 |
+| Parcel-weighted mean, m | 641.32 | 83.16 |
+| Cells above 1,000 m | 13 | 1 |
+
+Of these 30 cells, **28 improve and 2 worsen**. For example,
+`8729a578dffffff` retains a 2,287.82 m route snap versus 2,103.42 m from its sea
+center; its 11.80 parcels/day remain flagged. Land placement alone does not prove
+public-road access. Across all cells, the 627 route warnings carry 2,539.28
+parcels/day. The longest snaps occur at about 34.26°N, 117.96°W and nearby mountain
+cells, with less than one allocated household per cell. This is consistent with
+the uniform-within-block-group allocation limitation, rather than evidence of
+households observed at those remote points. Long snaps still need review before
+interpreting a travel-time matrix as coverage. No warning cells are discarded.
+
+Both distance columns and node IDs are saved in `demand_snaps.parquet` / `.csv`;
+`snap_comparison.json` records all-cell, marine-center, and low-demand summaries,
+including warning demand shares. Read-back checks confirm unchanged H3 order,
+households, parcels, and cell count, finite distances, and `node_id == route_node`
+for every row.
+
+The small-demand threshold is **strictly fewer than 1 parcel/day**. At 0.15 parcels
+per household this is fewer than **6.6666667 households**, since allocated household
+counts are fractional. Using `households < 7` would flag 540 cells; two of them
+already exceed one parcel/day. The actual strict threshold identifies:
+
+| Check | Result |
+| --- | ---: |
+| Low-demand cells | 538 / 1,865 (28.8472%) |
+| Households in those cells | 1,326.313738 |
+| Parcels per day in those cells | 198.947061 |
+| Share of total parcel demand | 0.039136% |
+| Cells retained in the demand layer | 1,865 |
+| Total parcels per day retained | 508,353.45 |
+
+The 538 low-demand cells have a route-snap median of 1,646.96 m, and 358 exceed
+1,000 m. Their original-center median is 1,745.53 m, with 364 exceeding 1,000 m.
+
+`audit_low_demand.py` adds `low_demand` flags and exports `low_demand_cells.csv` and
+`low_demand_report.json`; the H3 generation script also regenerates these flags.
+It does not delete or merge cells. A merging decision is deferred to period 3:
+fewer demand units could reduce assignment variables and per-cell constraints,
+while actual variable savings depend on feasible station–cell arcs. Any aggregation
+must conserve demand and disclose its spatial and coverage effects.
+
 ## Download and join design decisions
 
 Downloads first write to `.part` so an interrupted stream does not leave a final
@@ -302,7 +409,8 @@ data/processed/            Local outputs, ignored by Git
 
 - [x] Period 0: configuration, package structure, offline tests, pre-commit hooks, CI.
 - [x] Period 1: county downloads, join checks, water audit, mainland geometry, H3 allocation.
-- [ ] Period 2: industrial candidates, road graph, directed times, infeasibility report.
+- [ ] Period 2: industrial candidates, directed times, infeasibility report;
+      road-graph cache and paired snapping audit are complete.
 - [ ] Period 3: CFLP v1, four hand-checked toy cases, independent solution checker.
 - [ ] Period 4: single-sourcing, peak/outage stress tests, sensitivities, robust sites.
 - [ ] Period 5: tested DuckDB metrics and Tableau exports/dashboard.
@@ -318,7 +426,13 @@ utilization, served-weighted driving time, coverage, cost per served parcel, and
 unmet demand for each scenario. Do not interpret placeholder modules as completed analyses.
 
 Households are a demand proxy rather than observed orders. Parcel rates, costs,
-capacities, and congestion are assumptions. Planned area-weighted allocation assumes
+capacities, and congestion are assumptions. Area-weighted allocation assumes
 uniform household density within each block group. Industrial land alone does not
 establish vacancy or leasing suitability. This project does not optimize vehicle routes
 and does not represent the operations of any real company.
+
+Candidate stations are restricted to LA County (`candidates.boundary_scope: county`).
+Demand near the county boundary could in reality be served by stations in Orange or
+Ventura County. Excluding those alternatives can change selected sites, border
+coverage, capacity needs, and cost; model results are conditional on this study-area
+restriction. Road-graph truncation also excludes cross-boundary route alternatives.
