@@ -22,6 +22,7 @@ data:
   reference_place_geoid: "0603274"
   reference_place_name: Avalon city
   osm_extract_url: https://download.geofabrik.de/north-america/us/california/socal-latest.osm.pbf
+  osm_landuse_url: https://download.geofabrik.de/north-america/us/california/socal-latest-free.shp.zip
   raw_dir: data/raw
   processed_dir: data/processed
 
@@ -49,6 +50,9 @@ travel:
   graph_filename: la_mainland_drive.graphml
   graph_component: largest_strongly_connected
   snap_point: route
+  snap_method: nearest_edge_endpoint
+  speed_imputation: highway_mean
+  speed_fallback_kph: 30
   request_timeout_seconds: 180
   overpass_url: https://overpass.private.coffee/api
   http_user_agent: la-delivery-network/0.1.0 (independent research; https://github.com/Anran0716/la-delivery-network)

@@ -1,8 +1,9 @@
 # Pipeline scripts
 
 `01_download.py` downloads and joins the county inputs. `02_demand.py` constructs
-and audits the mainland H3 demand layer. The remaining entry points will be added
-in their corresponding implementation periods.
+and audits mainland H3 demand. `03_travel.py` generates industrial candidates,
+directed times, and a demand-weighted coverage-gap report. Model/scenario and SQL
+entry points will be added in their corresponding implementation periods.
 
 Run `audit_water.py` after `01_download.py` and before H3 allocation. It audits
 ALAND/AWATER, checks the same-year TIGER topological-face area totals, and saves
@@ -14,9 +15,18 @@ Before directed travel times, run `audit_low_demand.py` to flag cells below one
 parcel/day without deleting them. Install the `downloads` extra and run
 `download_drive_graph.py` to cache the driving graph from the configured source;
 `compare_snaps.py` snaps both land-route points and original H3 centers to the same
-largest strongly connected component. It exports both distance sets and selects
-only `route_node` as the model's `node_id`. All downloaded and processed files stay
-under ignored data directories. `03_travel.py` remains a later implementation step.
+largest strongly connected component in EPSG:3310. It exports distance to the
+nearest node, nearest edge, and the nearer endpoint of that edge. The endpoint is
+the model's `node_id`; H3-center distances remain as a separate audit.
+
+Run `download_landuse.py` for the Geofabrik land-use archive, then `03_travel.py`
+for county-clipped candidates (4 ha, 3 km spacing, up to 120) and directed shortest
+times after the 1.3 congestion multiplier. `travel_times_all.parquet` contains all
+OD pairs; `travel_times.parquet` / `.csv` retain the 45-minute superset. Baseline
+model arcs must use its `within_30_min` flag. Run `audit_travel.py` for independent
+NetworkX OD checks, county/spacing checks, demand retention, and the geographic
+edge-warning diagnostic. This audit requires the `downloads` extra for PBF metadata.
+All downloaded and processed files stay under ignored data directories.
 
 | Script | Purpose | Period |
 | --- | --- | --- |
@@ -24,7 +34,9 @@ under ignored data directories. `03_travel.py` remains a later implementation st
 | `02_demand.py` | Construct mainland H3 demand cells | 1 |
 | `audit_low_demand.py` | Flag and report small demand; retain all cells | 2 preparation |
 | `download_drive_graph.py` | Cache the mainland directed OSM drive graph | 2 preparation |
-| `compare_snaps.py` | Compare both point types; select route-point nodes | 2 preparation |
+| `compare_snaps.py` | Compare node/edge/endpoint distances; select endpoint nodes | 2 |
+| `download_landuse.py` | Cache Geofabrik industrial land-use source | 2 |
 | `03_travel.py` | Generate candidates and directed travel times | 2 |
+| `audit_travel.py` | Independently verify OD results and spatial constraints | 2 |
 | `04_scenarios.py` | Solve, validate, and record scenario results | 3–4 |
 | `05_metrics.py` | Run DuckDB metrics and export Tableau inputs | 5 |

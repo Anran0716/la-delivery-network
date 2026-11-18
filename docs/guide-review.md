@@ -4,6 +4,24 @@ The repository foundation and mainland demand layer are complete. The following
 notes record compatibility decisions and remaining modeling issues. Measured
 county and H3 results are reported in the README; scenario results are pending.
 
+## Directed travel and access resolved in period 2
+
+Nearest-node distance on a simplified graph measures proximity to its retained
+endpoints, so it can overstate road-access distance. The production audit now
+measures projected EPSG:3310 distance to the nearest edge and selects the nearer
+endpoint of that edge as the model node. All node, edge, and selected-endpoint
+distances remain distinct. The graph is not split; connector and partial-edge
+times remain outside the matrix, which limits door-to-door coverage interpretation.
+
+The complete matrix retains all 117 × 1,865 directed OD pairs. The model export
+keeps the 45-minute superset for outage analysis, while baseline feasible arcs
+must filter `within_30_min`. Speeds use OSM maxspeed, observed highway-type means
+for missing speeds, and a configured 30 km/h fallback. Congestion is applied once.
+Sparse-matrix construction takes the fastest parallel edge rather than adding
+parallel-edge times. Synthetic tests and 21 independent NetworkX OD checks verify
+these contracts. The 250 demand cells with no baseline candidate remain explicit
+for unmet-demand accounting in period 3.
+
 ## PuLP compatibility resolved in period 0
 
 The guide's Python 3.11 and `PULP_CBC_CMD` examples require PuLP 3.x. This project
