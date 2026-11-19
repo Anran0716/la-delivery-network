@@ -76,9 +76,9 @@ and the preregistered predictions. `audit_scenarios.py --allow-partial` provides
 an explicitly incomplete audit while solves are running.
 
 After the complete audit, `publish_scenario_report.py` writes small Git-tracked
-snapshots under `docs/`: all scenario summaries and audit evidence in JSON, a
-scenario comparison CSV, and all 117 candidates' coordinates and selection
-frequencies in CSV. It records configuration, package versions and SHA256 hashes
+snapshots under `docs/`: a measured Markdown report, all scenario summaries and
+audit evidence in JSON, a scenario comparison CSV, and all 117 candidates'
+coordinates and selection frequencies in CSV. It records configuration, package versions and SHA256 hashes
 for the model inputs, source and solver artifacts. The original prediction file
 is preserved separately; publishing results does not rewrite the forecast.
 

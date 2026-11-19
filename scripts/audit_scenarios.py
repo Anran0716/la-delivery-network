@@ -86,6 +86,7 @@ def main(allow_partial=False):
         assert summary["split_cells"] == 0
         report["scenarios"][scenario.name] = detail
     assignments = pd.read_parquet(root / "scenario_assign.parquet")
+    assert "s" not in assignments, "Use canonical solver_s; structural exclusions have no slack"
     station_tables = pd.read_parquet(root / "scenario_stations.parquet")
     assert set(assignments.scenario) == set(report["scenarios"])
     assert set(station_tables.scenario) == set(report["scenarios"])
@@ -154,6 +155,17 @@ def main(allow_partial=False):
         "station_ids": sorted(forced_sites),
         "not_open_in_old_penalized_network": sorted(forced_sites - legacy_ids),
         "interpretation": "Required for every full-service solution under the same 30-minute arcs",
+        "dedicated_demand_by_station": {
+            i: {
+                "single_candidate_cells": sum(v == i for v in single_provider_cells.values()),
+                "single_candidate_parcels": sum(
+                    base_data.demand[j]
+                    for j, station in single_provider_cells.items()
+                    if station == i
+                ),
+            }
+            for i in sorted(forced_sites)
+        },
     }
     for cost in (15000, 40000):
         if f"fixed_cost_{cost}" not in report["scenarios"]:
@@ -192,6 +204,28 @@ def main(allow_partial=False):
                 else "No material station-count change under preregistered threshold"
             ),
         }
+    fee_cases = ["baseline", "fixed_cost_15000", "fixed_cost_40000"]
+    fee_cases = [name for name in fee_cases if name in report["scenarios"]]
+    report["fixed_fee_cross_pricing"] = {}
+    for fee in (15000, 25000, 40000):
+        costs = {
+            name: report["scenarios"][name]["open_stations"] * fee
+            + report["scenarios"][name]["delivery_cost"]
+            for name in fee_cases
+        }
+        best = min(costs, key=lambda name: (costs[name], name))
+        report["fixed_fee_cross_pricing"][str(fee)] = {
+            "plan_objectives": costs,
+            "best_available_plan": best,
+            "best_available_objective": costs[best],
+            "interpretation": "Finite checked plan pool, not an exact optimum",
+        }
+    if len(fee_cases) == 3:
+        counts = [
+            report["scenarios"][name]["open_stations"]
+            for name in ("fixed_cost_15000", "baseline", "fixed_cost_40000")
+        ]
+        report["fixed_fee_incumbent_counts_nonincreasing"] = counts[0] >= counts[1] >= counts[2]
     if "peak_reoptimized" in report["scenarios"]:
         peak = report["scenarios"]["peak_reoptimized"]
         report["predictions"]["peak_reoptimization"] = {

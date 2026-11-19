@@ -3,16 +3,19 @@
 [![ci](https://github.com/Anran0716/la-delivery-network/actions/workflows/ci.yml/badge.svg)](https://github.com/Anran0716/la-delivery-network/actions/workflows/ci.yml)
 
 An independent project to plan last-mile delivery stations in Los Angeles County.
-The updated hard-service continuous v1 incumbent opens **37 stations** at an
-assumed objective of **990,938.45 USD/day**, with **all modeled s=0** and an
-8.6533-minute served-demand-weighted drive time. It adds 6 stations and
-125,301.38 USD/day versus the earlier P=100 reference. Its gap is 1.5855%, so it
-is not a proven exact optimum. Another 250 structurally uncovered cells remain
-outside the model. **Periods 0–3 are complete; v2 and period-4 scenarios are in progress.**
+The checked single-source v2 planning incumbent opens **38 stations** at an
+assumed objective of **1,018,404.49 USD/day**, with zero modeled unmet demand and
+an **8.9769-minute** served-parcel-weighted drive time. Keeping those stations
+under 40% peak demand leaves **69,924.39 parcels/day (9.8318%)** unmet even at
+100% utilization. The baseline gap is 4.2324%, so its station count is not a proven
+minimum. Another 250 structurally uncovered cells remain outside optimization.
+Across six unique reoptimization incumbents, **38 sites** are common, including
+13 required by coverage. Shared starts and unresolved gaps limit that stability
+claim. **Periods 0–4 are complete; DuckDB metrics and Tableau remain for period 5.**
 
-The planned pipeline uses ACS households, H3 demand cells, OSM industrial land and
-directed driving times, a capacitated facility-location model in PuLP, and a tested
-DuckDB metrics layer feeding Tableau Public.
+The pipeline uses ACS households, H3 demand cells, OSM industrial land, directed
+driving times and capacitated facility-location models in PuLP. The next period
+adds a tested DuckDB metrics layer feeding Tableau Public.
 
 ## Setup and checks
 
@@ -45,7 +48,7 @@ The solver smoke test checks actual execution, in addition to solver discovery.
 Tests use repository configuration, temporary files, synthetic geometries/graphs,
 and a tiny local MILP.
 CI installs software dependencies but does not download ACS, TIGER, OSM, or other
-study data. Optimization and SQL metrics are reserved for later periods.
+study data. Tested DuckDB metrics and Tableau exports remain for period 5.
 
 ## Download the county inputs
 
@@ -450,9 +453,11 @@ repair produced a checked 38-station start. The solver only receives starts that
 pass coverage, capacity, balance, opening and single-source checks; an invalid
 start is rejected before CBC is invoked. Separate tests exercise that rejection,
 capacity repair, station closure, and the exact six-parcel shortfall with two
-25-capacity stations and four 14-demand cells. All **79 offline tests pass**.
+25-capacity stations and four 14-demand cells. Directly corrupted w choices,
+hard-service violations and fixed-network changes are also rejected. All
+**87 offline tests pass**.
 
-The remaining period-4 scenarios are in progress. All reoptimization cases use
+All nine period-4 scenarios have passed the independent audit. Reoptimization cases use
 hard full service. Fixed-network peak and outage cases allow partial unmet demand.
 Every scenario retains the same 1,615 modeled cells; the same 250 excluded cells
 are reported outside optimization, scaled by the peak multiplier when applicable.
@@ -485,8 +490,70 @@ is at least 91,694.83 (12.884%). The new hard-service/v2 baseline may select mor
 than 31 stations. Main fixed-network scenarios will use that new baseline, with
 an additional legacy-31 peak comparison to test the original conditional forecast.
 
-Results will be compared with these predictions after the scenario runs, with
-feasible incumbents distinguished from exact optimality proofs.
+The [original prediction record](docs/period4-predictions.md) remains unchanged
+from commit `a56fd6e`, made before these solves. Measured comparisons follow.
+
+## Measured period-4 results
+
+The [complete scenario report](docs/period4-results.md) contains every station
+count, objective, unmet volume, weighted drive time, elapsed solve time and gap,
+plus the full common-site list and partial-selection frequencies. The
+[audited JSON snapshot](docs/period4-results.json) retains checks, bounds,
+configuration, input/source/solver hashes and the largest modeled unmet cells.
+
+| Scenario | Stations | Modeled unmet parcels/day | Modeled unmet rate | Gap |
+| --- | ---: | ---: | ---: | ---: |
+| V2 baseline, hard service | 38 | 0 | 0% | 4.2324% |
+| Peak, reoptimized with hard service | 49 | 0 | 0% | 7.0919% |
+| Peak, fixed new baseline and u=1 | 38 | 69,924.39 | 9.8318% | 0.0971% |
+| Outage C027, u=1 and 45-minute eligibility | 37 active | 0 | 0% | 0.5949% |
+| Capacity 15,000 | 47 | 0 | 0% | 5.6122% |
+| Capacity 25,000 | 38 | 0 | 0% | 17.1879% |
+| Fixed fee 15,000 | 38 | 0 | 0% | 4.0943% |
+| Fixed fee 40,000 | 38 | 0 | 0% | 4.3140% |
+| Peak, fixed legacy 31 stations and u=1 | 31 | 106,016.72 | 14.9067% | 0.0349% |
+
+These are feasible incumbents, with no exact optimality proof. Structural exclusions
+add 350.56 unmet parcels/day outside the model, or 490.78 under peak demand.
+Objectives include unmet penalties; penalties are not actual operating expense.
+
+The fixed-cost forecast is **consistent with the observed station counts**, but
+is not strongly validated: all three fees keep the same 38 sites and assignments,
+and neither sensitivity run improves its checked start. Cross-pricing all three
+plans at each fee finds the same cost. The shared starts and 4.09–4.31% gaps mean
+that genuine changes in optimal locations or counts remain unresolved.
+Similarly, the unchanged 25,000-capacity incumbent has a 17.19% gap and does not
+establish that larger stations cannot reduce the required network.
+
+The peak capacity forecast holds as a lower bound: a 49-site full-service plan
+is found versus the aggregate minimum of 42. The legacy 31-site network leaves
+106,016.72 parcels/day unmet (14.9067%), exceeding the preregistered minimum of
+91,204.05 (12.824%). Its independent divisible-demand flow lower bound is
+105,977.77, confirming that geographic bottlenecks explain most of that excess.
+The main fixed-network case uses the new 38-site reference;
+its 69,924.39 unmet parcels/day are close to an independently computed divisible
+maximum-flow lower bound of 69,849.59. Although total capacity is 760,000, local
+coverage and capacity bottlenecks prevent that total from being fully usable.
+
+Outage closes C027, carrying 16,998.35 baseline parcels/day. The remaining 37
+stations serve all modeled demand at a mean of 8.9819 minutes, **+0.0050 minutes**
+from baseline. Seventeen cells change provider; positive and negative changes
+largely offset. No served arc exceeds 30 minutes in this incumbent. Utilization
+also increases from 85% to 100%, so the small change is not an isolated effect of
+losing one station. The outage objective counts active-site fixed costs and must
+not be interpreted as a saving on committed rent.
+
+The common set has **38 sites across six unique reoptimizations**; baseline also
+serves as the Q=20,000 and f=25,000 control. This is selection stability among
+checked incumbents, not a proof of robust optimal sites. None of the six
+reoptimizations improves its checked start's objective. Separately, 177 cells
+have exactly one 30-minute candidate, making **13 sites necessary for any full-service solution** under these
+arcs: C012, C030, C069, C081, C087, C093, C094, C103, C104, C105, C107, C109, C116.
+C093 and C116 serve only 88.98 and 75.74 parcels/day in baseline, illustrating how
+coverage and the hard-service policy can require low-utilization stations.
+The [candidate frequency CSV](docs/period4-station-frequency.csv) lists every
+site's coordinates, per-profile decisions and count; the report lists all common
+and partially selected sites.
 
 ## Period 3 continuous-allocation CFLP v1
 
@@ -666,7 +733,7 @@ config = load_config("config.yaml")
 | Demand cells | H3 resolution 7 | Guide assumption for tractable model size |
 | Parcel rate | 0.15 parcels per household per day | Planning assumption; external volume and market-share sources still need verification |
 | Capacity and baseline utilization | 20,000 parcels per day; 85% | Assumed capacity with operating headroom |
-| Fixed cost | USD 25,000 per station per day | Assumed rent and fixed labor; sensitivity planned |
+| Fixed cost | USD 25,000 per station per day | Assumed rent and fixed labor; sensitivity measured with reported gaps |
 | Delivery cost | USD 0.015 per parcel per minute | Assumed USD 1.5 vehicle-minute × 2 / 200 parcels |
 | Congestion | Free-flow driving time × 1.3 | Uniform planning assumption |
 | Coverage | 30 minutes; outage allowance 45 minutes | Assumed operating limits after congestion adjustment |
@@ -705,7 +772,7 @@ data/processed/            Local outputs, ignored by Git
 - [x] Period 1: county downloads, join checks, water audit, mainland geometry, H3 allocation.
 - [x] Period 2: industrial candidates, nearest-edge/endpoints, directed times, coverage-gap report.
 - [x] Period 3: CFLP v1, hand-checked cases, independent checks, linking benchmark and unmet diagnosis.
-- [ ] Period 4: single-sourcing, peak/outage stress tests, sensitivities, robust sites.
+- [x] Period 4: single-sourcing, peak/outage stress tests, sensitivities, selection stability and forecast audit.
 - [ ] Period 5: tested DuckDB metrics and Tableau exports/dashboard.
 - [ ] Period 6: measured results, design decisions, limitations, reproducibility review.
 
@@ -714,8 +781,8 @@ to resolve before implementing later periods.
 
 ## Results and limitations
 
-The v1 planning benchmark is reported above. Single-source station selection,
-peak/outage performance, robust sites, and tested SQL metrics remain pending.
+The v1/v2 benchmarks, stress cases and sensitivity incumbents are reported above.
+Tested SQL metrics and Tableau outputs remain for period 5.
 These are assumption-based planning results, not measured operating performance.
 
 Households are a demand proxy rather than observed orders. Parcel rates, costs,

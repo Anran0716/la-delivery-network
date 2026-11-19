@@ -74,6 +74,7 @@ def combine_outputs(root, scenarios, candidates):
         outside["in_model"] = False
         actual = pd.concat([actual, outside], ignore_index=True)
         actual["served_parcels"] = actual.parcels
+        actual = actual.drop(columns=["s"], errors="ignore")
         actual["scenario"] = scenario.name
         assignment_tables.append(actual)
         opened = set(stations.loc[stations.opened > 0.5, "candidate_id"])

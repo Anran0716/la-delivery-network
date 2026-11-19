@@ -1,8 +1,8 @@
 # P2 guide review
 
-The repository foundation and mainland demand layer are complete. The following
-notes record compatibility decisions and remaining modeling issues. Measured
-county and H3 results are reported in the README; scenario results are pending.
+Periods 0–4 are complete. The following notes record compatibility decisions,
+modeling choices and remaining metric-layer work. Measured county, routing,
+v1/v2 and scenario results are reported in the README and `period4-results.md`.
 
 ## Directed travel and access resolved in period 2
 
