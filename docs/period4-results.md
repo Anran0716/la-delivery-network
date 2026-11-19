@@ -1,5 +1,9 @@
 # Measured period-4 results
 
+**Historical shared-start batch. Its common-site list and unchanged fixed-fee
+plans are not accepted robustness/sensitivity conclusions. See
+[the solver-quality review](quality-review.md).**
+
 All figures are assumption-based planning results from independently checked
 feasible incumbents. Solver bounds and actual elapsed times are retained.
 Station counts are not proven minima. The fixed-network reference is the

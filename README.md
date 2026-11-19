@@ -3,6 +3,10 @@
 [![ci](https://github.com/Anran0716/la-delivery-network/actions/workflows/ci.yml/badge.svg)](https://github.com/Anran0716/la-delivery-network/actions/workflows/ci.yml)
 
 An independent project to plan last-mile delivery stations in Los Angeles County.
+**Period 4 quality review is in progress; do not use the earlier 38-site common
+set as a robust-site recommendation. Period 5 is on hold.** The first scenario
+batch below is retained as a historical benchmark, not an accepted sensitivity
+conclusion. Its shared starts and dollar gaps leave station counts unresolved.
 The checked single-source v2 planning incumbent opens **38 stations** at an
 assumed objective of **1,018,404.49 USD/day**, with zero modeled unmet demand and
 an **8.9769-minute** served-parcel-weighted drive time. Keeping those stations
@@ -11,7 +15,8 @@ under 40% peak demand leaves **69,924.39 parcels/day (9.8318%)** unmet even at
 minimum. Another 250 structurally uncovered cells remain outside optimization.
 Across six unique reoptimization incumbents, **38 sites** are common, including
 13 required by coverage. Shared starts and unresolved gaps limit that stability
-claim. **Periods 0–4 are complete; DuckDB metrics and Tableau remain for period 5.**
+claim. **The data pipeline through period 4 is complete; optimization quality is
+being repaired before DuckDB metrics or Tableau work.**
 
 The pipeline uses ACS households, H3 demand cells, OSM industrial land, directed
 driving times and capacitated facility-location models in PuLP. The next period
@@ -495,6 +500,10 @@ from commit `a56fd6e`, made before these solves. Measured comparisons follow.
 
 ## Measured period-4 results
 
+**Historical first batch, superseded for decision-making pending the quality
+rerun.** Neither the common-site list nor the fixed-cost results below establish
+robustness or cost insensitivity.
+
 The [complete scenario report](docs/period4-results.md) contains every station
 count, objective, unmet volume, weighted drive time, elapsed solve time and gap,
 plus the full common-site list and partial-selection frequencies. The
@@ -780,6 +789,28 @@ See [guide review notes](docs/guide-review.md) for compatibility and modeling is
 to resolve before implementing later periods.
 
 ## Results and limitations
+
+### The cost of the last 0.04% of demand
+
+In the historical continuous incumbents, enforcing full service adds six sites
+to serve the final 219.43 modeled parcels/day (about 0.0432% of demand). The
+objective increases by 125,301.38 USD/day, approximately **571 USD per additional
+parcel**. Because the P=100 objective already includes an unmet penalty, the
+increase in operating cost is actually 147,244.41 USD/day, approximately **671 USD
+per additional parcel**. These are incumbent comparisons, not exact marginal-cost
+proofs, and neither number is a quote for an outside carrier.
+
+This exposes a business choice: obtain a real USPS or partner-carrier service
+quote for that tail and compare outsourcing with dedicated stations. The model
+should disclose this cost and let the business set service policy rather than
+automatically demand a dedicated facility for every remote cell.
+
+The aggregate capacity floor explains the rough scale of the P=100 network, but
+does not explain the hard-service network. Thirteen sites are individually
+forced by single-candidate coverage. A site can satisfy both coverage and
+capacity needs, so those 13 cannot simply be subtracted from total station count.
+County-only candidates and a hard 30-minute limit together raise the pressure
+to open sites; relaxing either would require a separate, disclosed scenario.
 
 The v1/v2 benchmarks, stress cases and sensitivity incumbents are reported above.
 Tested SQL metrics and Tableau outputs remain for period 5.

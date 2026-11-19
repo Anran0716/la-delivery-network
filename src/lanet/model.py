@@ -25,6 +25,16 @@ def build_model(
         raise ValueError("Linking must be strong or weak")
     problem = pulp.LpProblem(f"cflp_{linking}", pulp.LpMinimize)
     y = {i: pulp.LpVariable(f"y_{k:04d}", cat=pulp.LpBinary) for k, i in enumerate(data.capacity)}
+    if full_service:
+        providers = {j: [] for j in data.demand}
+        for i, j in data.unit_cost:
+            providers[j].append(i)
+        for choices in providers.values():
+            if len(choices) == 1:
+                station = choices[0]
+                if fixed_openings is not None and fixed_openings[station] == 0:
+                    raise ValueError("Fixed network closes a coverage-forced station")
+                y[station].bounds(1, 1)
     if fixed_openings is not None:
         if fixed_openings.keys() != data.capacity.keys() or any(
             value not in (0, 1) for value in fixed_openings.values()
@@ -121,6 +131,7 @@ def solve_model(
     single_source: bool = False,
     fixed_openings: dict | None = None,
     warm_start: dict | None = None,
+    solver_name: str = "CBC",
 ) -> dict:
     """Run CBC sequentially in an isolated directory with relative filenames.
 
@@ -176,12 +187,41 @@ def solve_model(
             options=["randomSeed 1", "randomCbcSeed 1"],
             timeMode="elapsed",
         )
+        if solver_name == "HiGHS":
+            from lanet.highs import CheckedHiGHS
+
+            solver = CheckedHiGHS(
+                timeLimit=time_limit_seconds,
+                gapRel=relative_gap,
+                threads=1,
+                msg=True,
+                log_file="highs.log",
+                log_to_console=False,
+                random_seed=1,
+            )
+        elif solver_name != "CBC":
+            raise ValueError("Unknown solver")
         solve_started = time.perf_counter()
         problem.solve(solver)
         solve_seconds = time.perf_counter() - solve_started
     finally:
         os.chdir(previous)
-    metadata = parse_cbc_log((folder / "cbc.log").read_text(encoding="utf-8"))
+    if solver_name == "CBC":
+        metadata = parse_cbc_log((folder / "cbc.log").read_text(encoding="utf-8"))
+    else:
+        info = problem.solverModel.getInfo()
+        if not problem.solverModel.getSolution().value_valid:
+            raise ValueError("HiGHS returned no valid incumbent")
+        metadata = {
+            "termination_reason": problem.solverModel.modelStatusToString(
+                problem.solverModel.getModelStatus()
+            ),
+            "proven_optimal": info.mip_gap <= 1e-9,
+            "best_bound": info.mip_dual_bound,
+            "relative_gap": info.mip_gap,
+            "incumbent_objective_log": info.objective_function_value,
+            "highs_version": problem.solverModel.version(),
+        }
     metadata.update(
         {
             "linking": linking,
@@ -191,7 +231,8 @@ def solve_model(
             "solve_wall_seconds": solve_seconds,
             "time_limit_seconds": time_limit_seconds,
             "requested_relative_gap": relative_gap,
-            "cbc_threads_parameter": 0,
+            "cbc_threads_parameter": 0 if solver_name == "CBC" else None,
+            "threads": 1,
             "execution_mode": "native_serial",
             "random_seed": 1,
             "warm_start": warm_start is not None,
@@ -201,6 +242,12 @@ def solve_model(
             "single_source": single_source,
             "variables": len(problem.variables()),
             "constraints": len(problem.constraints),
+            "solver_name": solver_name,
+            "absolute_gap_usd": max(
+                0, float(pulp.value(problem.objective)) - metadata["best_bound"]
+            )
+            if metadata["best_bound"] is not None
+            else None,
         }
     )
     if problem.sol_status not in {pulp.LpSolutionOptimal, pulp.LpSolutionIntegerFeasible}:
