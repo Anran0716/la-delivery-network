@@ -15,6 +15,8 @@ from lanet.model import solve_model
 from lanet.scenarios import apply_scenario, scenario_definitions
 from lanet.starts import single_source_start
 
+SCENARIO_SOLVER = "HiGHS"
+
 
 def run(folder, data, frames, *, single, full, fixed=None, start=None, seconds=600, solver="HiGHS"):
     if (folder / "summary.json").exists():
@@ -121,6 +123,7 @@ def main():
             single=False,
             full=scenario.full_service,
             fixed=fixed,
+            solver=SCENARIO_SOLVER,
         )
         seed, audit = single_source_start(
             data, v1, full_service=scenario.full_service, fixed_openings=fixed
@@ -128,7 +131,7 @@ def main():
         if seed is None:
             raise ValueError("Scenario-specific v1 failed to produce a checked v2 seed")
         if scenario.name == "baseline":
-            cbc_result, cbc = run(
+            _, cbc = run(
                 root / "benchmark_cbc600",
                 data,
                 frames,
@@ -143,8 +146,7 @@ def main():
             comparison = {"CBC600": cbc, "HiGHS600": highs, "same_checked_seed": audit}
             (root / "solver_comparison.json").write_text(json.dumps(comparison, indent=2))
             result, summary = high, highs
-            if cbc["validation"]["objective"] < highs["validation"]["objective"]:
-                result, summary = cbc_result, cbc
+            # The comparison is descriptive; it never selects the scenario solver.
             if summary["solver"]["absolute_gap_usd"] >= 25000:
                 result, summary = run(
                     root / "baseline1800",
@@ -154,6 +156,7 @@ def main():
                     full=True,
                     start=result,
                     seconds=1800,
+                    solver=SCENARIO_SOLVER,
                 )
             summary = write_solution(
                 root / "baseline",
@@ -171,6 +174,7 @@ def main():
                 full=scenario.full_service,
                 fixed=fixed,
                 start=seed,
+                solver=SCENARIO_SOLVER,
             )
         summary["own_v1_rounding"] = audit
         summary["closed_station"] = closed

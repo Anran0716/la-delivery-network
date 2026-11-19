@@ -1,9 +1,27 @@
 # Period 4 solver-quality repair
 
-The initial shared-start batch is historical evidence, not a robust-site
-recommendation. Period 5 is on hold until the quality review is reported.
+The single complete quality batch is finished. Its [final results](quality-results.md)
+retain every gap, including failures of the quality filter. No second county-scale
+review or optimization round follows; period 5 has not been started.
 
-Run `python scripts/04_quality.py` after the offline tests pass. The runner writes
+## Solver rule and scope
+
+All scenarios use **HiGHS**, including baseline and its extended run. The reason
+is the explicitly checked `setSolution` path for initial values. The CBC comparison
+is descriptive and never selects the scenario solver. `SCENARIO_SOLVER` in the
+runner makes this rule explicit.
+
+This policy clarification was made at closeout, after the completed batch; it
+is **not** a preregistered solver-choice rule. The realized baseline and all nine
+scenario results already used HiGHS, so the code correction changes none of the
+reported numbers and triggers no rerun. Original execution hashes remain in the
+result snapshot; the edited runner is the clarified implementation.
+
+CBC and HiGHS were compared **once**, on this model and this checked start, seed 1,
+serial execution, with 600 seconds requested. The result supports a statement
+about this experiment only, not that HiGHS is better for this problem class.
+
+The completed `python scripts/04_quality.py` invocation followed offline tests and wrote
 to `data/processed/quality_v2/`, preserving the first batch. Its protocol hashes
 the input tables, model/checker/start sources and runner; changed inputs or code
 stop cache reuse. Cached solutions are independently checked again.
@@ -18,8 +36,8 @@ stop cache reuse. Cached solutions are independently checked again.
    repair it, and independently validate the resulting v2 start.
 3. Compare CBC and HiGHS on exactly that same v2 model and checked start, using
    a 600-second limit, 0.5% relative target, seed 1 and serial execution.
-4. If the selected baseline incumbent's dollar gap is at least 25,000 USD/day,
-   allow the baseline HiGHS run 1,800 seconds with the best checked incumbent.
+4. If the HiGHS baseline incumbent's dollar gap is at least 25,000 USD/day,
+   allow the baseline HiGHS run 1,800 seconds with its checked 600-second incumbent.
 5. Every other scenario first solves its own continuous v1 cold, then generates
    and validates its own v2 start. Each phase has a 600-second limit. Fixed-network
    stress cases use the repaired baseline network; legacy31 remains a separate
