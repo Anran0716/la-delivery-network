@@ -1,5 +1,7 @@
 # Project guide and historical development record
 
+The completed reduced period 5 is documented in [SQL metrics and static map](metrics.md).
+
 Current results: [final single-batch report](quality-results.md). Earlier numbers below are historical experiments; setup commands run from the repository root.
 
 # LA delivery network

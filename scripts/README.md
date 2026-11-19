@@ -1,5 +1,10 @@
 # Pipeline scripts
 
+Reduced period 5 is implemented by `05_metrics.py`: frozen solutions to DuckDB
+views, scenario/station metrics and a static baseline map. Install the `plots`
+extra for rendering. Definitions, boundary cases and result links are in
+`docs/metrics.md`. It never invokes a solver; Tableau is deferred.
+
 The current period-4 quality repair uses `04_quality.py`, followed by
 `report_quality.py` after all nine cases finish. See `docs/quality-review.md`.
 The earlier `04_scenarios.py` outputs are historical shared-start experiments.
