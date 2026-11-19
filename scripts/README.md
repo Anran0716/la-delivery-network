@@ -28,6 +28,16 @@ NetworkX OD checks, county/spacing checks, demand retention, and the geographic
 edge-warning diagnostic. This audit requires the `downloads` extra for PBF metadata.
 All downloaded and processed files stay under ignored data directories.
 
+For period 3, first run `pytest tests/test_model_toys.py tests/test_solution_check.py -v`.
+Their hand calculations are in `docs/toy-model-hand-calculations.md`. Only after
+they pass, run `04_model_v1.py` for sequential strong/weak CBC solves, followed by
+`diagnose_v1_unmet.py` for independent maximum-flow checks of capacity and coverage.
+The 250 structurally uncovered cells stay outside the optimization objective and
+are exported separately. `model_v1/strong` and `model_v1/weak` retain solver logs,
+MPS/solution files, station/assignment/unmet tables, independent checks and bounds.
+`model_v1/comparison.json` records the benchmark and `unmet_diagnostic.json`
+distinguishes selected-network shortfalls from all-candidate infeasibility.
+
 | Script | Purpose | Period |
 | --- | --- | --- |
 | `01_download.py` | Download ACS households and TIGER boundaries | 1 |
@@ -38,5 +48,7 @@ All downloaded and processed files stay under ignored data directories.
 | `download_landuse.py` | Cache Geofabrik industrial land-use source | 2 |
 | `03_travel.py` | Generate candidates and directed travel times | 2 |
 | `audit_travel.py` | Independently verify OD results and spatial constraints | 2 |
+| `04_model_v1.py` | Compare strong/weak continuous-allocation CFLP v1 | 3 |
+| `diagnose_v1_unmet.py` | Independently diagnose modeled unmet demand with maximum flow | 3 |
 | `04_scenarios.py` | Solve, validate, and record scenario results | 3–4 |
 | `05_metrics.py` | Run DuckDB metrics and export Tableau inputs | 5 |

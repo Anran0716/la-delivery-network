@@ -2,12 +2,15 @@
 
 [![ci](https://github.com/Anran0716/la-delivery-network/actions/workflows/ci.yml/badge.svg)](https://github.com/Anran0716/la-delivery-network/actions/workflows/ci.yml)
 
-An independent project to plan the location and capacity of last-mile delivery
-stations in Los Angeles County. The intended decision is how many stations to open,
-where to put them, and how the network performs under a 40% demand peak or a station
-outage. **Periods 0–2 are complete: county inputs, mainland demand, candidate sites,
-road access, and directed travel times have been validated. No station
-recommendations or location-model results have been computed yet.**
+An independent project to plan last-mile delivery stations in Los Angeles County.
+The continuous-allocation v1 baseline incumbent opens **31 stations**, with an
+assumed daily objective of **USD 865,637.07** including unmet penalties,
+and a served-parcel-weighted drive time of **9.02 minutes**.
+It leaves **219.43 parcels/day** unmet within the modeled area; another **350.56**
+parcels/day lack any 30-minute candidate and are reported separately. The solve
+stops with a **0.3319% relative gap**, without an exact optimality proof.
+**Periods 0–3 are complete.** Single-sourcing and peak/outage scenarios are next;
+no robust-site recommendation has been established.
 
 The planned pipeline uses ACS households, H3 demand cells, OSM industrial land and
 directed driving times, a capacitated facility-location model in PuLP, and a tested
@@ -247,6 +250,8 @@ the endpoint can be farther away than the globally nearest node. Long simplified
 edges and one-way roads can affect the resulting origin/destination time. No
 point-to-road connector or partial-edge travel time is added to the drive matrix.
 Consequently, these are node-to-node planning times, not door-to-door delivery times.
+A metric-layer access-time sensitivity at an assumed 20 km/h is deferred to period 5;
+it does not change this model or the current matrix.
 
 | Route-point distance check, 1,865 cells | Nearest node | Nearest edge | Selected endpoint |
 | --- | ---: | ---: | ---: |
@@ -395,6 +400,140 @@ any aggregation must conserve demand and disclose its spatial/coverage effects.
 `audit_low_demand.py` exports flags, `low_demand_cells.csv`, and
 `low_demand_report.json`; `02_demand.py` also regenerates the flags.
 
+## Period 3 continuous-allocation CFLP v1
+
+The [four hand calculations](docs/toy-model-hand-calculations.md) were completed
+before implementation or county optimization. The tests reproduce objectives
+**100, 180, 140, and 220**, under both strong and weak linking. The coverage case
+accepts either tied optimum, A alone or B alone. The final serial-profile gate:
+
+```text
+tests/test_model_toys.py::test_toy_base PASSED
+tests/test_model_toys.py::test_toy_high_fixed_cost PASSED
+tests/test_model_toys.py::test_toy_capacity_binds PASSED
+tests/test_model_toys.py::test_toy_coverage PASSED
+4 passed in 2.09s
+```
+
+With daily parcels `d_j`, opening variables `y_i`, allocation fractions `x_ij`,
+and unmet fractions `s_j`, the objective is:
+
+```text
+min sum_i f_i*y_i + sum_(i,j in A) 0.015*t_ij*d_j*x_ij + 100*sum_j d_j*s_j
+sum_i x_ij + s_j = 1                       for each modeled cell
+sum_j d_j*x_ij <= 0.85*20,000*y_i           for each candidate station
+x_ij <= y_i                               strong linking only
+y binary; x and s continuous in [0,1]
+```
+
+Only **29,238 arcs at or below 30 minutes** enter either model. It has 117
+candidate openings and 1,615 demand cells, representing **508,002.89 parcels/day**.
+The 250 structurally uncovered cells (350.56 parcels/day) are exported separately,
+outside model variables and the objective. Their demand is still included in
+county-wide unserved totals. Per-station usable capacity is **17,000 parcels/day**,
+so full modeled service needs at least **30 stations**. The independently checked
+station count and station loads enforce this scale check.
+
+Strong linking adds the per-arc `x_ij <= y_i` rows. They are redundant for integer
+openings when all demand is positive, but strengthen the fractional relaxation.
+Both models retain exactly the same candidate set, arcs, costs, demand and capacity.
+
+`check_solution()` imports no PuLP and accepts `y`, `x`, `s`, and raw input data.
+It recomputes balance, binary openings, bounds, capacity, coverage, closed-station
+links, objective components and the served-parcel-weighted mean travel time.
+It rejects deliberately corrupted solutions, including a capacity violation.
+CBC text-rounding tolerances are 1e-6 for fractions, 0.01 parcel/day for capacity,
+and 0.05 USD/day (or 1e-8 relative) for objective reconstruction. Unmet parcels
+are excluded from the mean-travel denominator.
+
+Reproduce **in this order** from the repository root:
+
+```powershell
+.venv\Scripts\python.exe -m pytest tests/test_model_toys.py tests/test_solution_check.py -v
+# Continue only after every offline model/checker test passes:
+.venv\Scripts\python.exe scripts/04_model_v1.py
+.venv\Scripts\python.exe scripts/diagnose_v1_unmet.py
+```
+
+The county script runs strong then weak with a 600-second elapsed-time limit,
+0.005 requested relative gap, seed 1, no warm start, and CBC native serial mode
+(`threads=0`). An initial Windows CBC 2.10.3 trial using `threads=1` stalled in
+thread waits; it was archived and excluded from this comparison, then both cases
+were rerun with the same serial profile. See the [compatibility notes](docs/guide-review.md).
+Elapsed solve time includes MPS writing/solver invocation, while model-build time
+and CBC's own wall time are recorded separately. These are individual local runs,
+not repeated controlled performance measurements.
+
+A finite penalty does **not** guarantee all `s_j=0`. The regression counterexample
+is one parcel with a 25,000 fixed opening cost versus a 100 unmet penalty: leaving
+it unmet is optimal. Full baseline service would require an explicit condition
+or a priority objective. Existing assumptions are retained so the benchmark does
+not hide any unmet demand. CBC termination reasons and numeric bounds determine
+whether a result is proven optimal; PuLP's coarse `Optimal` label is insufficient.
+The reported gap is `(incumbent - lower_bound) / abs(incumbent)`; CBC's rounded
+printed `Gap: 0.00` is not treated as proof of a zero gap.
+
+All inputs, raw CBC logs, MPS/solution files, full allocations, station loads,
+unmet fractions, independent checks and summaries are retained locally under
+`data/processed/model_v1/`. `structurally_uncovered.csv` is separate from model
+`unmet.parquet`; `comparison.json` and `unmet_diagnostic.json` keep their scopes explicit.
+
+### Measured baseline and linking comparison
+
+The following [benchmark snapshot](docs/model-v1-benchmark.json) preserves the
+input hashes, binary hash, settings, numerical checks, bounds and outcomes. Both
+models pass `check_solution()` and the quantity scale check. The strong-linking
+incumbent has the lower independently recomputed objective and is retained as the
+v1 baseline for later comparison; it is **not a proven exact optimum**.
+
+| Check | Strong linking | Weak linking |
+| --- | ---: | ---: |
+| Open stations | 31 | 31 |
+| Objective, USD/day including penalty | 865,637.07 | 866,747.11 |
+| Parcel-weighted mean drive time, min | 9.0188 | 9.1457 |
+| Positive s cells | 146 | 158 |
+| Modeled unmet parcels/day | 219.43 | 220.87 |
+| Elapsed solve time, seconds | 263.76 | 601.35 |
+| CBC wall time, seconds | 262.37 | 600.55 |
+| Initial LP lower bound, USD/day | 862,764 | 793,977 |
+| Final lower bound, USD/day | 862,763.727 | 861,935.517 |
+| Final gap | 0.3319% | 0.5551% |
+| Stop condition | Within gap tolerance | Time limit |
+| Proven exact optimum | No | No |
+
+The stronger initial relaxation raises the bound from 793,977 to 862,764. It also
+requires 30,970 rows versus 1,732, with 30,970 variables in both formulations.
+For these individual serial runs, strong linking reaches the requested 0.5% gap
+in 263.76 seconds; weak linking uses its time
+limit and stops at 0.5551%. This is evidence for
+using the stronger formulation here, rather than a universal speed guarantee.
+
+**The baseline s values are not all zero.** All 146 positive s values are 1;
+those cells have no open station within 30 minutes in the selected 31-station
+network. They account for 219.43 parcels/day, of which 94 cells are low-demand.
+Their penalty is **21,943.03 USD/day**, compared with **25,000 USD/day** per new
+station. This is consistent with the finite-penalty tradeoff; it does not prove
+that this incumbent's particular station set is globally optimal.
+
+An independent maximum-flow diagnostic shows that opening all 117 candidates
+can serve all **508,002.89** modeled parcels/day. The selected strong network's
+maximum-flow shortfall is **219.43**, matching its unmet demand. The maximum
+station load is 17,000.000015 parcels/day, within CBC text-rounding tolerance of
+17,000. Neither the number of stations nor capacity units fail the scale check.
+The model's finite penalty permits a network with some unserved cells; a business
+requirement for zero modeled unmet demand would need an explicit baseline rule.
+No penalties or constraints were silently changed to force the reported s values.
+
+The **250 structural exclusions / 350.56 parcels/day** remain outside this
+objective. Including them, the strong baseline leaves **569.99
+parcels/day** unserved in the mainland study area. The weighted drive-time
+calculation uses served parcels only and excludes both types of unserved demand.
+
+The source road graph has **460,060 directed edges and zero explicit zero-time
+edges**; its shortest edge is 0.026532 seconds. CSR conversion now rejects any
+explicit zero-time edge, and a synthetic test exercises that guard. Zero OD time
+for identical origin/destination nodes is a separate valid case.
+
 ## Download and join design decisions
 
 Downloads first write to `.part` so an interrupted stream does not leave a final
@@ -465,8 +604,8 @@ src/lanet/model.py          Period 3: facility-location model
 src/lanet/check.py          Period 3: independent solution checks
 src/lanet/scenarios.py      Period 4: scenario analysis
 sql/metrics.sql             Period 5: metric definitions; SQL implementation pending
-scripts/                   Pipeline entry-point plan
-tests/                     Offline configuration and CBC smoke tests
+scripts/                   Reproducible pipeline and audit entry points
+tests/                     Offline geometry, routing, model and checker tests
 data/raw/                  Local downloads, ignored by Git
 data/processed/            Local outputs, ignored by Git
 .github/workflows/ci.yml    Ruff, pytest, and CBC verification
@@ -477,7 +616,7 @@ data/processed/            Local outputs, ignored by Git
 - [x] Period 0: configuration, package structure, offline tests, pre-commit hooks, CI.
 - [x] Period 1: county downloads, join checks, water audit, mainland geometry, H3 allocation.
 - [x] Period 2: industrial candidates, nearest-edge/endpoints, directed times, coverage-gap report.
-- [ ] Period 3: CFLP v1, four hand-checked toy cases, independent solution checker.
+- [x] Period 3: CFLP v1, hand-checked cases, independent checks, linking benchmark and unmet diagnosis.
 - [ ] Period 4: single-sourcing, peak/outage stress tests, sensitivities, robust sites.
 - [ ] Period 5: tested DuckDB metrics and Tableau exports/dashboard.
 - [ ] Period 6: measured results, design decisions, limitations, reproducibility review.
@@ -487,9 +626,9 @@ to resolve before implementing later periods.
 
 ## Results and limitations
 
-No operational results are available yet. Results will include selected stations,
-utilization, served-weighted driving time, coverage, cost per served parcel, and
-unmet demand for each scenario. Do not interpret placeholder modules as completed analyses.
+The v1 planning benchmark is reported above. Single-source station selection,
+peak/outage performance, robust sites, and tested SQL metrics remain pending.
+These are assumption-based planning results, not measured operating performance.
 
 Households are a demand proxy rather than observed orders. Parcel rates, costs,
 capacities, and congestion are assumptions. Area-weighted allocation assumes

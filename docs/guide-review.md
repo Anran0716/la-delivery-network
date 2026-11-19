@@ -35,6 +35,46 @@ isolated pytest directory and uses `keepFiles=True`, which gives CBC relative
 filenames. Apply the same working-directory discipline to later model runs or
 use a writable solver temporary path without spaces.
 
+## V1 validation and finite penalties in period 3
+
+The four guide cases were calculated by hand before implementation; see
+`toy-model-hand-calculations.md`. Each is solved under both strong and weak linking.
+`check_solution()` imports no PuLP code and independently checks dictionary keys,
+bounds, binary openings, balance, capacity, allowed arcs, closed stations, costs,
+and served-demand-weighted travel time. Corrupted-solution tests exercise rejection.
+
+The guide's claim that a high per-parcel penalty guarantees baseline `s=0` does
+not follow mathematically. A one-parcel cell with a 25,000 fixed opening cost and
+100 unmet penalty is optimally left unmet. This counterexample is a regression
+test. Keep finite-penalty output honest; requiring full service would need a hard
+baseline condition or an explicit priority objective. Do not change parameters
+silently to make a reported baseline appear fully served.
+
+CBC's final result line and objective lower bound determine termination and gap.
+PuLP 3.3 can label a stopped feasible solution `Optimal`, and CBC can also report
+"Optimal solution found (within gap tolerance)". Neither is evidence of an exact
+proof. The benchmark reports `(incumbent-lower_bound)/abs(incumbent)` from the
+numeric bounds, rather than CBC's two-decimal printed gap.
+
+The bundled Windows CBC is 2.10.3. An initial `threads=1` weak-link run stalled:
+both coordination threads waited in `UserRequest` while CPU time stopped growing.
+It was aborted and archived locally, and both formulations were restarted under
+the same native serial `threads=0` profile. This is consistent with CBC's
+[thread-mode documentation](https://www.coin-or.org/Doxygen/Cbc/classCbcModel.html),
+which distinguishes parallel mode 0 (off) from mode 1 (testing). The abandoned
+trial is excluded from timing comparisons; exact cause of its wait was not proven.
+
+The 250 cells without any 30-minute candidate are outside the v1 optimization and
+its objective. Model-selected-network unmet demand and that structural exclusion
+must be reported separately, then combined for a county-wide unserved total.
+
+## Access-time decision deferred to period 5
+
+The v1 matrix and objective remain node-to-node. A metric-layer sensitivity could
+add `route_edge_snap_m / (20_000 / 60)` minutes at an assumed 20 km/h. Whether to
+add that diagnostic, and how to label its assumptions, is deferred to period 5.
+It would not alter graph topology or silently change this baseline benchmark.
+
 ## Demand conservation boundary in period 1
 
 Compare allocated demand against the same mainland population retained by the

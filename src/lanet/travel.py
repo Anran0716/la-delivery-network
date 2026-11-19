@@ -140,6 +140,9 @@ def directed_travel_times(
         cols.append(positions[v])
         weights.append(weight)
     edges = pd.DataFrame({"u": rows, "v": cols, "seconds": weights})
+    zero_time_edges = int(edges.seconds.eq(0).sum())
+    if zero_time_edges:
+        raise ValueError(f"Zero-time directed edges must be reviewed before CSR: {zero_time_edges}")
     minimum = edges.groupby(["u", "v"], sort=False).seconds.min().reset_index()
     matrix = csr_matrix(
         (minimum.seconds, (minimum.u, minimum.v)), shape=(len(node_ids), len(node_ids))

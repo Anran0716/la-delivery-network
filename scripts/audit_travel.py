@@ -28,6 +28,14 @@ def main():
     model_times = pd.read_parquet(processed / "travel_times.parquet")
     with (processed / "drive_time_graph.pickle").open("rb") as stream:
         graph = pickle.load(stream)  # Only the locally generated cache.
+    edge_seconds = np.fromiter(
+        (float(data["travel_time"]) for _, _, data in graph.edges(data=True)), dtype=float
+    )
+    zero_time_edges = int((edge_seconds == 0).sum())
+    if zero_time_edges:
+        raise ValueError(
+            f"Zero-time edges require review before sparse conversion: {zero_time_edges}"
+        )
     assert demand.h3.equals(original.h3)
     assert demand.households.equals(original.households)
     assert demand.parcels.equals(original.parcels)
@@ -85,6 +93,9 @@ def main():
     uncovered = demand.loc[~demand.h3.isin(reachable)]
     report = {
         "checks_passed": True,
+        "directed_edges_checked": len(edge_seconds),
+        "zero_time_edges": zero_time_edges,
+        "minimum_edge_seconds": float(edge_seconds.min()),
         "networkx_od_pairs_checked": checked,
         "minimum_station_spacing_m": minimum_spacing,
         "low_demand_cells_retained": int(demand.low_demand.sum()),

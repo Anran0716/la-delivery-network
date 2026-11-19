@@ -110,6 +110,15 @@ def test_directed_times_reject_invalid_edge_weights(weight):
         directed_travel_times(graph, origins, demand, 1.3)
 
 
+def test_directed_times_reject_explicit_zero_edge_before_sparse_conversion():
+    graph = nx.MultiDiGraph()
+    graph.add_edge(1, 2, travel_time=0)
+    origins = pd.DataFrame({"candidate_id": ["A"], "node_id": [1]})
+    demand = pd.DataFrame({"h3": ["toy"], "node_id": [2]})
+    with pytest.raises(ValueError, match="Zero-time directed edges.*1"):
+        directed_travel_times(graph, origins, demand, 1.3)
+
+
 def test_nearest_edge_selects_its_endpoint_instead_of_unrelated_nearest_node():
     graph = nx.MultiDiGraph(crs="EPSG:3310", simplified=True)
     for node, x, y in [(1, 0, 0), (2, 10000, 0), (3, 4500, 100), (4, 4500, 200)]:
