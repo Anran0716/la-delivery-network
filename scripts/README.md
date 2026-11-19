@@ -1,5 +1,11 @@
 # Pipeline scripts
 
+The current period-4 quality repair uses `04_quality.py`, followed by
+`report_quality.py` after all nine cases finish. See `docs/quality-review.md`.
+The earlier `04_scenarios.py` outputs are historical shared-start experiments.
+Their fingerprint guard intentionally prevents reusing them after model-source
+changes; the quality runner preserves them and uses a separate output directory.
+
 `01_download.py` downloads and joins the county inputs. `02_demand.py` constructs
 and audits mainland H3 demand. `03_travel.py` generates industrial candidates,
 directed times, and a demand-weighted coverage-gap report. Periods 3–4 implement

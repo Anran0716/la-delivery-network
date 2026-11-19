@@ -20,6 +20,14 @@ def run(folder, data, frames, *, single, full, fixed=None, start=None, seconds=6
     if (folder / "summary.json").exists():
         result = read_solution(folder)
         summary = json.loads((folder / "summary.json").read_text())
+        metadata = summary["solver"]
+        if (
+            metadata["solver_name"] != solver
+            or metadata["time_limit_seconds"] != seconds
+            or metadata["single_source"] != single
+            or metadata["full_service"] != full
+        ):
+            raise ValueError("Cached solver settings differ from requested run")
         check_solution(
             result["y"],
             result["x"],
@@ -31,6 +39,8 @@ def run(folder, data, frames, *, single, full, fixed=None, start=None, seconds=6
             fixed_openings=fixed,
             objective=summary["validation"]["objective"],
         )
+        result["validation"] = summary["validation"]
+        result["solver"] = metadata
         return result, summary
     print(f"START {folder}: {solver} {seconds}s", flush=True)
     result = solve_model(

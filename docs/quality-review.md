@@ -10,6 +10,10 @@ stop cache reuse. Cached solutions are independently checked again.
 
 1. Hard full-service models fix every single-provider coverage station to y=1.
    Stress models permitting unmet demand do not impose those openings.
+   These bounds are already implied by full service and the strong links, even
+   in the LP relaxation; explicit fixing does not change the feasible region or
+   theoretical LP bound. A presolver may already infer them, so performance gains
+   cannot be attributed to fixing alone without a separate controlled experiment.
 2. Solve the baseline's own continuous v1 without an inherited start, round and
    repair it, and independently validate the resulting v2 start.
 3. Compare CBC and HiGHS on exactly that same v2 model and checked start, using
@@ -32,3 +36,9 @@ of an exact station count, because delivery costs and opening costs can trade of
 Any remaining frequency analysis must be described as selection frequency among
 independently initialized, approximately optimal checked solutions, with each
 solution's bound and quality retained. High-gap cases must be visibly separated.
+
+The frequency export includes all six unique reoptimization profiles and a
+separate quality-filtered count. The filter is an absolute gap below the profile's
+own one-site fixed fee (15,000 / 25,000 / 40,000 USD/day), defined before those
+scenario reruns complete. No profile is removed from the main scenario table.
+A filtered subset does not support a robustness claim across excluded profiles.

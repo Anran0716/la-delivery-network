@@ -781,7 +781,7 @@ data/processed/            Local outputs, ignored by Git
 - [x] Period 1: county downloads, join checks, water audit, mainland geometry, H3 allocation.
 - [x] Period 2: industrial candidates, nearest-edge/endpoints, directed times, coverage-gap report.
 - [x] Period 3: CFLP v1, hand-checked cases, independent checks, linking benchmark and unmet diagnosis.
-- [x] Period 4: single-sourcing, peak/outage stress tests, sensitivities, selection stability and forecast audit.
+- [ ] Period 4: pipeline complete; solver-quality repair and independently initialized reruns in progress.
 - [ ] Period 5: tested DuckDB metrics and Tableau exports/dashboard.
 - [ ] Period 6: measured results, design decisions, limitations, reproducibility review.
 
