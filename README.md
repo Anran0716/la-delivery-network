@@ -3,14 +3,12 @@
 [![ci](https://github.com/Anran0716/la-delivery-network/actions/workflows/ci.yml/badge.svg)](https://github.com/Anran0716/la-delivery-network/actions/workflows/ci.yml)
 
 An independent project to plan last-mile delivery stations in Los Angeles County.
-The continuous-allocation v1 baseline incumbent opens **31 stations**, with an
-assumed daily objective of **USD 865,637.07** including unmet penalties,
-and a served-parcel-weighted drive time of **9.02 minutes**.
-It leaves **219.43 parcels/day** unmet within the modeled area; another **350.56**
-parcels/day lack any 30-minute candidate and are reported separately. The solve
-stops with a **0.3319% relative gap**, without an exact optimality proof.
-**Periods 0–3 are complete.** Single-sourcing and peak/outage scenarios are next;
-no robust-site recommendation has been established.
+The updated hard-service continuous v1 incumbent opens **37 stations** at an
+assumed objective of **990,938.45 USD/day**, with **all modeled s=0** and an
+8.6533-minute served-demand-weighted drive time. It adds 6 stations and
+125,301.38 USD/day versus the earlier P=100 reference. Its gap is 1.5855%, so it
+is not a proven exact optimum. Another 250 structurally uncovered cells remain
+outside the model. **Periods 0–3 are complete; v2 and period-4 scenarios are in progress.**
 
 The planned pipeline uses ACS households, H3 demand cells, OSM industrial land and
 directed driving times, a capacitated facility-location model in PuLP, and a tested
@@ -399,6 +397,68 @@ its time limit. Potential variable savings depend on feasible station–cell arc
 any aggregation must conserve demand and disclose its spatial/coverage effects.
 `audit_low_demand.py` exports flags, `low_demand_cells.csv`, and
 `low_demand_report.json`; `02_demand.py` also regenerates the flags.
+
+## Hard full-service baseline update
+
+The baseline now imposes **s=0** on all 1,615 modeled cells; the 250 structurally
+uncovered cells remain separately reported. The [measured hard-service run](docs/model-v1-full-service.json)
+was completed before starting the county v2/scenarios.
+
+| V1 comparison | P=100 penalized reference | Hard s=0 baseline |
+| --- | ---: | ---: |
+| Open stations | 31 | **37** |
+| Objective, USD/day | 865,637.07 | **990,938.45** |
+| Modeled unmet parcels/day | 219.43 | **0** |
+| Weighted drive time, min | 9.0188 | 8.6533 |
+| Split cells | 28 | **28** |
+
+The hard-service incumbent adds **6 stations** and **125,301.38 USD/day** to the
+objective. Operating cost rises by **147,244.41 USD/day**; the smaller objective
+increase also reflects removal of 21,943.03 USD/day of unmet penalties. These are
+incumbent comparisons, not an exact minimum cost of requiring full service.
+The hard run stops on CBC's time limit with a **1.5855% gap** and 975,227.491 lower
+bound; measured solve wall time is 653.95 seconds despite the configured soft
+600-second limit. Every solution passes the independent checker.
+
+This update illustrates why the aggregate 30-station capacity lower bound does
+not determine the full-service optimum: coverage of small or remote cells can
+require additional sites. The subsequent v2 reference uses the hard-service
+policy, while peak/outage fixed-network scenarios permit partial unmet demand
+at each cell's single selected station. The legacy 31-station peak remains a
+separate comparison so its preregistered capacity prediction stays testable.
+
+## Single-source v2 baseline and checked starts
+
+V2 uses binary `w_ij` to choose at most one station for a cell, while continuous
+`x_ij` is the fraction actually served. The constraints are `x_ij <= w_ij`,
+`w_ij <= y_i`, and `sum_i w_ij <= 1`, alongside balance and capacity. A stress
+scenario can therefore partially serve a cell at its one station, with the rest
+recorded in s. This resolves the guide's indivisible-cell/unmet-demand conflict.
+When `s=0`, these constraints imply `x=w`; the implementation eliminates the
+duplicate continuous columns for hard-service runs without changing the model.
+
+The [checked v2 baseline incumbent](docs/model-v2-baseline.json) opens **38 sites**,
+with objective **1,018,404.49 USD/day**, zero modeled unmet demand and **zero split
+cells**. Its weighted drive time is **8.9769 min**. Relative to the hard-service v1
+incumbent, this is **+1 station / +27,466.04 USD/day**. The v2 run stops on its time
+limit with a **4.2324% gap**, so the incumbent difference is not a proven minimum
+single-sourcing premium. Both problems retain the same demand universe and costs.
+
+The naive maximum-fraction rounding of v1 was **rejected** by `check_solution()`:
+C012 would receive **17,037.93 > 17,000** parcels/day. A deterministic capacity
+repair produced a checked 38-station start. The solver only receives starts that
+pass coverage, capacity, balance, opening and single-source checks; an invalid
+start is rejected before CBC is invoked. Separate tests exercise that rejection,
+capacity repair, station closure, and the exact six-parcel shortfall with two
+25-capacity stations and four 14-demand cells. All **79 offline tests pass**.
+
+The remaining period-4 scenarios are in progress. All reoptimization cases use
+hard full service. Fixed-network peak and outage cases allow partial unmet demand.
+Every scenario retains the same 1,615 modeled cells; the same 250 excluded cells
+are reported outside optimization, scaled by the peak multiplier when applicable.
+Outage extends travel eligibility to 45 minutes without changing that universe.
+The main fixed network is the new v2 baseline; the legacy P=100 network of 31
+stations is an additional peak comparison, not a replacement for the new baseline.
 
 ## Predictions registered before period 4
 

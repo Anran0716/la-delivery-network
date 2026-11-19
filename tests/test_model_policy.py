@@ -19,3 +19,21 @@ def test_small_isolated_demand_can_be_cheaper_to_leave_unserved(tmp_path):
     assert result["validation"]["objective"] == 100
     assert result["y"]["A"] == 0
     assert result["s"]["tiny"] == 1
+
+
+def test_hard_full_service_overrides_penalty_tradeoff(tmp_path):
+    data = FacilityData(
+        demand={"tiny": 1},
+        capacity={"A": 20000},
+        fixed_cost={"A": 25000},
+        unit_cost={("A", "tiny"): 0},
+        travel_minutes={("A", "tiny"): 0},
+        utilization_limit=0.85,
+        unmet_penalty=100,
+    )
+    result = solve_model(
+        data, "strong", tmp_path, full_service=True, time_limit_seconds=10, relative_gap=0
+    )
+    assert result["y"]["A"] == 1
+    assert result["s"]["tiny"] == 0
+    assert result["validation"]["objective"] == 25000
