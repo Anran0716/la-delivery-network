@@ -131,3 +131,59 @@ def test_invalid_warm_start_is_rejected_before_solver(tmp_path, monkeypatch):
     }
     with pytest.raises(ValueError):
         solve_model(data, "strong", tmp_path, single_source=True, warm_start=seed)
+
+
+@pytest.mark.parametrize(
+    ("failure", "message"),
+    [
+        ("second_source", "more than one station"),
+        ("unlinked_service", "exceeds its single-source"),
+        ("fractional_w", "w must be binary"),
+        ("closed_source", "w selects a closed station"),
+        ("unknown_arc", "valid w keys"),
+        ("missing_w", "valid w keys"),
+    ],
+)
+def test_checker_rejects_corrupt_single_source_choices(failure, message):
+    data = toy()
+    y = {"A": 0, "B": 0, "C": 1}
+    x = {("C", j): 1 for j in data.demand}
+    w = dict(x)
+    s = dict.fromkeys(data.demand, 0)
+    if failure == "second_source":
+        y["A"] = 1
+        w["A", "0"] = 1
+    elif failure == "unlinked_service":
+        w["C", "0"] = 0
+    elif failure == "fractional_w":
+        w["C", "0"] = 0.5
+    elif failure == "closed_source":
+        w["A", "0"] = 1
+    elif failure == "unknown_arc":
+        w["unknown", "0"] = 0
+    else:
+        w = None
+    with pytest.raises(ValueError, match=message):
+        check_solution(y, x, s, data, w=w, single_source=True)
+
+
+def test_checker_distinguishes_partial_service_from_hard_service():
+    data = toy()
+    y = {"A": 0, "B": 0, "C": 1}
+    x = {("C", j): 1 for j in data.demand}
+    w = dict(x)
+    s = dict.fromkeys(data.demand, 0)
+    x["C", "0"] = s["0"] = 0.5
+    result = check_solution(y, x, s, data, w=w, single_source=True)
+    assert result["unmet_parcels"] == 5
+    with pytest.raises(ValueError, match="Full-service baseline requires s=0"):
+        check_solution(y, x, s, data, w=w, single_source=True, require_full_service=True)
+
+
+def test_checker_rejects_fixed_network_change():
+    data = toy()
+    y = {"A": 0, "B": 0, "C": 1}
+    x = {("C", j): 1 for j in data.demand}
+    s = dict.fromkeys(data.demand, 0)
+    with pytest.raises(ValueError, match="fixed station openings"):
+        check_solution(y, x, s, data, fixed_openings={"A": 1, "B": 0, "C": 0})

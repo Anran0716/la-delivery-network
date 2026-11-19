@@ -2,8 +2,9 @@
 
 `01_download.py` downloads and joins the county inputs. `02_demand.py` constructs
 and audits mainland H3 demand. `03_travel.py` generates industrial candidates,
-directed times, and a demand-weighted coverage-gap report. Model/scenario and SQL
-entry points will be added in their corresponding implementation periods.
+directed times, and a demand-weighted coverage-gap report. Periods 3–4 implement
+the checked facility-location models and scenario runner. SQL metrics remain for
+period 5.
 
 Run `audit_water.py` after `01_download.py` and before H3 allocation. It audits
 ALAND/AWATER, checks the same-year TIGER topological-face area totals, and saves
@@ -38,6 +39,49 @@ MPS/solution files, station/assignment/unmet tables, independent checks and boun
 `model_v1/comparison.json` records the benchmark and `unmet_diagnostic.json`
 distinguishes selected-network shortfalls from all-candidate infeasibility.
 
+For period 4, run the offline single-source and warm-start tests first:
+
+```powershell
+.venv\Scripts\python.exe -m pytest tests/test_v2.py tests/test_solution_check.py -v
+.venv\Scripts\python.exe scripts/04_full_service_v1.py
+.venv\Scripts\python.exe scripts/04_scenarios.py
+.venv\Scripts\python.exe scripts/audit_scenarios.py
+.venv\Scripts\python.exe scripts/publish_scenario_report.py
+```
+
+`04_full_service_v1.py` preserves the P=100 reference and writes a separate hard
+`s=0` continuous run. Its output is required before v2. `04_scenarios.py` runs
+sequential CBC solves for v2 baseline, peak reoptimization, fixed-network peak,
+outage, capacity and fixed-cost sensitivities, and a separate legacy-31 peak test.
+The default capacity and fixed-cost controls both reuse baseline, so selection
+frequency counts six unique reoptimization profiles. All hard-service runs use
+`x=w`; fixed-network stress runs retain partial service at one selected station.
+
+Every warm start must pass `check_solution()` before reaching CBC. Cache reuse
+also rechecks feasibility and requires a matching configuration, fixed network,
+input-data hashes and formulation-source hashes. Changed fingerprints raise an
+error instead of silently mixing experiments. `--only baseline` or a list of
+scenario names can run a subset, provided its baseline dependencies exist. CBC's
+600-second limit is soft; actual wall times, bounds and termination reasons are
+retained, including overruns and feasible runs without exact optimality proofs.
+
+Each case saves solver artifacts, rounding/repair audit, station/assignment/unmet
+tables and structural exclusions under `data/processed/model_v2/<scenario>/`.
+Combined `scenario_stations.parquet` and `scenario_assign.parquet` include all
+cases; the latter retains the 250 out-of-model cells with `in_model=False` and
+null `solver_s`. They are counted as unserved study-area demand separately from
+model slack. The audit rechecks all nine cases, combined-table conservation,
+station loads, fixed-network maximum-flow lower bounds, selection frequencies,
+and the preregistered predictions. `audit_scenarios.py --allow-partial` provides
+an explicitly incomplete audit while solves are running.
+
+After the complete audit, `publish_scenario_report.py` writes small Git-tracked
+snapshots under `docs/`: all scenario summaries and audit evidence in JSON, a
+scenario comparison CSV, and all 117 candidates' coordinates and selection
+frequencies in CSV. It records configuration, package versions and SHA256 hashes
+for the model inputs, source and solver artifacts. The original prediction file
+is preserved separately; publishing results does not rewrite the forecast.
+
 | Script | Purpose | Period |
 | --- | --- | --- |
 | `01_download.py` | Download ACS households and TIGER boundaries | 1 |
@@ -50,5 +94,8 @@ distinguishes selected-network shortfalls from all-candidate infeasibility.
 | `audit_travel.py` | Independently verify OD results and spatial constraints | 2 |
 | `04_model_v1.py` | Compare strong/weak continuous-allocation CFLP v1 | 3 |
 | `diagnose_v1_unmet.py` | Independently diagnose modeled unmet demand with maximum flow | 3 |
-| `04_scenarios.py` | Solve, validate, and record scenario results | 3–4 |
+| `04_full_service_v1.py` | Rerun continuous v1 with hard s=0 | 4 preparation |
+| `04_scenarios.py` | Solve single-source v2 and all scenario profiles | 4 |
+| `audit_scenarios.py` | Independently check saved cases, exports and predictions | 4 |
+| `publish_scenario_report.py` | Export audited summaries, candidate frequencies and hashes | 4 |
 | `05_metrics.py` | Run DuckDB metrics and export Tableau inputs | 5 |

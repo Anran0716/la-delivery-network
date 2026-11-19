@@ -96,9 +96,16 @@ remain unmet, even if every station can reach every cell. The 6-parcel expectati
 is an aggregate-capacity lower bound achievable with divisible demand, not with
 that binary model.
 
-Before implementing period 4, choose and document the operating rule: either keep
-whole-cell service and revise that test, or use a binary station-assignment variable
-plus continuous served quantities so each cell can be partially served by its one
-assigned station. The latter preserves single-sourcing while permitting exact
-unmet quantities. A rounded v1 solution must also pass capacity checks before it
-is used as a warm start.
+Period 4 resolves this with binary station assignment `w_ij` and continuous served
+fraction `x_ij`: `x_ij <= w_ij`, `w_ij <= y_i`, and `sum_i w_ij <= 1`. A cell can
+be partially served at its one selected station. The remaining demand is `s_j`.
+The synthetic fixed-network test now attains exactly six unmet parcels. With hard
+`s=0`, balance forces `x=w`, allowing duplicate continuous columns to be eliminated.
+
+The naive maximum-fraction rounding of the hard-service v1 incumbent violates
+C012's 17,000-parcel usable capacity (17,037.93 assigned). It is rejected by the
+independent checker. A deterministic repair supplies a feasible 38-station start,
+which is checked again before any initial values reach CBC. Tests verify rejection
+before solver invocation as well as the capacity repair. The incumbent comparison
+and solver bounds are reported separately; a difference between two time-limited
+incumbents is not an exact optimal single-sourcing premium.
