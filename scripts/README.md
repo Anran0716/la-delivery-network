@@ -1,5 +1,10 @@
 # Pipeline scripts
 
+`outage_control.py` performs the separately requested single no-closure control
+with 37 frozen baseline sites, 100% utilization and 45-minute eligibility. It
+uses a new output folder and reuses an existing checked result rather than
+solving a second time. Report: `docs/outage-control.md`.
+
 Reduced period 5 is implemented by `05_metrics.py`: frozen solutions to DuckDB
 views, scenario/station metrics and a static baseline map. Install the `plots`
 extra for rendering. Definitions, boundary cases and result links are in

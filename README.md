@@ -17,3 +17,5 @@ An independent project to plan LA County delivery stations and test peak demand 
 ![Baseline station locations; circle size shows daily parcel volume](docs/station-map.png)
 
 The outage scenario allows 100% utilization and up to 45 minutes of driving. Above results use modeled demand; exclusions and all five SQL metric definitions are in [metrics and limitations](docs/metrics.md).
+
+Under matched 100% / 45-minute conditions, closing one station adds about 26 seconds to mean drive time, with zero modeled unmet demand in both checked solutions. [Outage control](docs/outage-control.md).

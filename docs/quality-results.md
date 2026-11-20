@@ -1,5 +1,9 @@
 # Repaired solver-quality results
 
+A later, explicitly requested [no-closure outage control](outage-control.md)
+isolates the comparison under the same 100% utilization / 45-minute policy.
+It is one additional reassignment solve; the original nine-case batch remains frozen.
+
 Selection among independently initialized scenario incumbents; quality subset has absolute dollar gap below that profile's single-site fixed fee. Not statistical independence or proof across optimal solutions.
 
 All realized scenario solutions and final baseline used HiGHS. Fixed-HiGHS policy clarified at closeout, not claimed as preregistered. CBC comparison is one model/start/seed-1 experiment, not a solver-family ranking.
