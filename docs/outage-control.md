@@ -13,7 +13,7 @@ baseline allocation is the feasible start. Slack and single-sourcing match outag
 | Outage (100%, 45 min) | 36 | 8.2076 | 0.00 | 62,542.48 | 1,336.44 |
 
 Outage minus matched no-closure control: **+0.4330 minutes**.
-This compares checked incumbents, not exact optima or a measured real-world causal effect.
-Active-site fixed costs differ by 25,000 USD/day; that is not committed-rent savings.
+Checked incumbent comparison only; no exact-optimality or real-world causal claim.
+Active-site fixed cost (no closure minus outage): 25,000.00 USD/day; that is not committed-rent savings.
 Structural exclusions add 350.56 unmet parcels/day outside the modeled totals.
-The original nine scenarios, predictions, metrics and map remain frozen.
+Original 9-case batch, predictions, metrics and map remain frozen.
